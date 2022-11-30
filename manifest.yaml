@@ -1,0 +1,106 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: egressd
+  labels:
+    app.kubernetes.io/name: egressd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: egressd
+  labels:
+    app.kubernetes.io/name: egressd
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - pods
+    verbs:
+      - get
+      - list
+      - patch
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: egressd
+  labels:
+    app.kubernetes.io/name: egressd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: egressd
+subjects:
+  - kind: ServiceAccount
+    name: egressd
+    namespace: egressd
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: egressd
+  labels:
+    app.kubernetes.io/name: egressd
+spec:
+  selector:
+    matchLabels:
+      name: egressd
+  template:
+    metadata:
+      labels:
+        name: egressd
+    spec:
+      serviceAccountName: egressd
+      hostNetwork: true
+      initContainers:
+        - name: enable_nf_stats
+          image: busybox:1.35.0
+          args:
+            - "/bin/echo"
+            - "1"
+            - "/proc/sys/net/netfilter/nf_conntrack_acct"
+      containers:
+        - name: egressd
+          image: "ghcr.io/castai/egressd:am1"
+          imagePullPolicy: Always
+          args:
+            - "/usr/local/bin/egressd"
+            - "-cilium"
+            - "true"
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - SYS_MODULE
+            privileged: true
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - mountPath: /hostnet
+              name: nf-conntrack
+            - mountPath: /hostproc/sys/net/netfilter
+              name: netfilter
+            - mountPath: /sys/fs/bpf
+              mountPropagation: HostToContainer
+              name: bpf-maps
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+        - name: nf-conntrack
+          hostPath:
+            path: /proc/net
+        - name: netfilter
+          hostPath:
+            path: /proc/sys/net/netfilter
+        - name: bpf-maps
+          hostPath:
+            path: /sys/fs/bpf
+            type: DirectoryOrCreate
+
