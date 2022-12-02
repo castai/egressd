@@ -6,6 +6,7 @@ require (
 	github.com/cilium/cilium v1.12.4
 	github.com/cilium/lumberjack/v2 v2.2.2
 	github.com/florianl/go-conntrack v0.3.0
+	github.com/hashicorp/golang-lru/v2 v2.0.1
 	github.com/json-iterator/go v1.1.12
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0

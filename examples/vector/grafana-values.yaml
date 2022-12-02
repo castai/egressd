@@ -1,0 +1,48 @@
+fullnameOverride: grafana-egress
+adminPassword: admin
+useStatefulSet: true
+persistence:
+  enabled: true
+  type: statefulset
+  size: 2Gi
+image:
+  repository: aocenas/grafana
+  tag: profiling-ds-2
+env:
+  GF_FEATURE_TOGGLES_ENABLE: flameGraph
+  GF_DIAGNOSTICS_PROFILING_ENABLED: true
+  GF_DIAGNOSTICS_PROFILING_ADDR: 0.0.0.0
+  GF_DIAGNOSTICS_PROFILING_PORT: 6060
+podAnnotations:
+  phlare.grafana.com/scrape: "true"
+  phlare.grafana.com/port: "6060"
+grafana.ini:
+  server:
+    serve_from_sub_path: false
+    root_url: /
+  analytics:
+    check_for_updates: false
+  grafana_net:
+    url: https://grafana.net
+  log:
+    mode: console
+  auth.anonymous:
+    enabled: true
+    org_name: Main Org.
+    org_role: Admin
+  users:
+    default_theme: light
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Phlare
+        type: phlare
+        url: http://phlare.egressd.svc.cluster.local:4100
+        access: proxy
+      - name: Loki
+        type: loki
+        url: http://loki-read-headless.egressd.svc.cluster.local:3100
+        access: proxy
+        isDefault: true

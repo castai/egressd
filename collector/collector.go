@@ -2,10 +2,13 @@ package collector
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"hash/maphash"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/golang-lru/v2"
 
 	"github.com/castai/egressd/conntrack"
 	"github.com/castai/egressd/kube"
@@ -22,13 +25,18 @@ func New(cfg Config, log logrus.FieldLogger, kubeWatcher kube.Watcher, conntrack
 			excludeNsMap[ns] = struct{}{}
 		}
 	}
+	processedEntriesCache, err := lru.New[uint64, struct{}](cfg.CacheItems)
+	if err != nil {
+		panic(err)
+	}
 	return &Collector{
-		cfg:          cfg,
-		log:          log,
-		kubeWatcher:  kubeWatcher,
-		conntracker:  conntracker,
-		metricsChan:  make(chan PodNetworkMetric, 10000),
-		excludeNsMap: excludeNsMap,
+		cfg:                   cfg,
+		log:                   log,
+		kubeWatcher:           kubeWatcher,
+		conntracker:           conntracker,
+		processedEntriesCache: processedEntriesCache,
+		metricsChan:           make(chan PodNetworkMetric, 10000),
+		excludeNsMap:          excludeNsMap,
 	}
 }
 
@@ -36,18 +44,17 @@ type Config struct {
 	Interval          time.Duration
 	NodeName          string
 	ExcludeNamespaces string
+	CacheItems        int
 }
 
 type Collector struct {
-	cfg          Config
-	log          logrus.FieldLogger
-	kubeWatcher  kube.Watcher
-	conntracker  conntrack.Client
-	excludeNsMap map[string]struct{}
-
-	//mu          sync.RWMutex
-	//metrics     []PodNetworkMetric
-	metricsChan chan PodNetworkMetric
+	cfg                   Config
+	log                   logrus.FieldLogger
+	kubeWatcher           kube.Watcher
+	conntracker           conntrack.Client
+	processedEntriesCache *lru.Cache[uint64, struct{}]
+	excludeNsMap          map[string]struct{}
+	metricsChan           chan PodNetworkMetric
 }
 
 func (a *Collector) GetMetricsChan() <-chan PodNetworkMetric {
@@ -113,16 +120,29 @@ func (a *Collector) run() error {
 				a.log.Warning("dropping metric event, channel is full")
 			}
 		}
+		a.markProcessedEntries(podConns)
 	}
 
 	return nil
 }
 
-func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []conntrack.Entry, ts int64) ([]PodNetworkMetric, error) {
-	grouped, err := groupConns(podConns)
-	if err != nil {
-		return nil, err
+func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
+	for _, e := range entries {
+		hash := entryKey(&e)
+		a.processedEntriesCache.Add(hash, struct{}{})
 	}
+}
+
+func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []conntrack.Entry, ts int64) ([]PodNetworkMetric, error) {
+	newCons := make([]conntrack.Entry, 0)
+	for _, conn := range podConns {
+		hash := entryKey(&conn)
+		if _, found := a.processedEntriesCache.Get(hash); !found {
+			newCons = append(newCons, conn)
+		}
+	}
+
+	grouped := groupConns(newCons)
 	res := make([]PodNetworkMetric, 0, len(grouped))
 	for _, conn := range grouped {
 		metric := PodNetworkMetric{
@@ -197,17 +217,14 @@ type groupedConn struct {
 	txPackets uint64
 }
 
-func groupConns(conns []conntrack.Entry) (map[uint64]*groupedConn, error) {
+func groupConns(conns []conntrack.Entry) map[uint64]*groupedConn {
 	grouped := make(map[uint64]*groupedConn)
 	for _, conn := range conns {
 		// TODO: Fix this logic. For Cilium this is OK. For linux nf we actually want reply.
 		if conn.Reply {
 			continue
 		}
-		key, err := connKey(&conn)
-		if err != nil {
-			return nil, err
-		}
+		key := connGroupKey(&conn)
 		group, found := grouped[key]
 		if !found {
 			group = &groupedConn{
@@ -220,26 +237,50 @@ func groupConns(conns []conntrack.Entry) (map[uint64]*groupedConn, error) {
 		group.txBytes += conn.TxBytes
 		group.txPackets += conn.TxPackets
 	}
-	return grouped, nil
+	return grouped
 }
 
 var connHash maphash.Hash
 
-func connKey(conn *conntrack.Entry) (uint64, error) {
+func connGroupKey(conn *conntrack.Entry) uint64 {
 	srcIP := conn.Src.IP().As4()
-	if _, err := connHash.Write(srcIP[:]); err != nil {
-		return 0, err
-	}
+	_, _ = connHash.Write(srcIP[:])
 	dstIP := conn.Dst.IP().As4()
-	if _, err := connHash.Write(dstIP[:]); err != nil {
-		return 0, err
-	}
-	if err := connHash.WriteByte(conn.Proto); err != nil {
-		return 0, err
-	}
+	_, _ = connHash.Write(dstIP[:])
+	_ = connHash.WriteByte(conn.Proto)
 	res := connHash.Sum64()
 	connHash.Reset()
-	return res, nil
+	return res
+}
+
+var entryHash maphash.Hash
+
+func entryKey(conn *conntrack.Entry) uint64 {
+	srcIP := conn.Src.IP().As4()
+	_, _ = entryHash.Write(srcIP[:])
+	var srcPort [2]byte
+	binary.LittleEndian.PutUint16(srcPort[:], conn.Src.Port())
+	_, _ = entryHash.Write(srcPort[:])
+
+	dstIP := conn.Dst.IP().As4()
+	_, _ = entryHash.Write(dstIP[:])
+	var dstPort [2]byte
+	binary.LittleEndian.PutUint16(dstPort[:], conn.Dst.Port())
+	_, _ = entryHash.Write(dstPort[:])
+
+	var txBytes [8]byte
+	binary.LittleEndian.PutUint64(txBytes[:], conn.TxBytes)
+	_, _ = entryHash.Write(txBytes[:])
+
+	var rxBytes [8]byte
+	binary.LittleEndian.PutUint64(rxBytes[:], conn.RxBytes)
+	_, _ = entryHash.Write(rxBytes[:])
+
+	_ = entryHash.WriteByte(conn.Proto)
+	res := entryHash.Sum64()
+
+	entryHash.Reset()
+	return res
 }
 
 func getNodeZone(node *corev1.Node) string {

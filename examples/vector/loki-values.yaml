@@ -1,0 +1,15 @@
+fullnameOverride: loki-egressd
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: 'filesystem'
+
+write:
+  replicas: 1
+read:
+  replicas: 1
+
+gateway:
+  enabled: false

@@ -1,8 +1,9 @@
 package collector
 
 import (
-	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/castai/egressd/conntrack"
 	"github.com/castai/egressd/kube"
@@ -10,26 +11,89 @@ import (
 	"github.com/stretchr/testify/require"
 	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCollector(t *testing.T) {
+	r := require.New(t)
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
 
-	connTracker := &mockConntrack{}
-	kubeWatcher := &mockKubeWatcher{}
+	entries := []conntrack.Entry{
+		{
+			Src:       netaddr.MustParseIPPort("10.104.7.12:40001"),
+			Dst:       netaddr.MustParseIPPort("10.104.7.5:3000"),
+			TxBytes:   10,
+			TxPackets: 1,
+			RxBytes:   20,
+			RxPackets: 2,
+			Proto:     6,
+			Reply:     false,
+		},
+		{
+			Src:       netaddr.MustParseIPPort("10.104.7.12:40002"),
+			Dst:       netaddr.MustParseIPPort("10.104.7.5:3000"),
+			TxBytes:   10,
+			TxPackets: 1,
+			RxBytes:   20,
+			RxPackets: 2,
+			Proto:     6,
+			Reply:     false,
+		},
+	}
+
+	connTracker := &mockConntrack{
+		entries: map[netaddr.IP][]conntrack.Entry{
+			entries[0].Src.IP(): entries,
+		},
+	}
+	kubeWatcher := &mockKubeWatcher{
+		pods: []*corev1.Pod{
+			{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "p1",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "n1",
+				},
+				Status: corev1.PodStatus{
+					PodIP: "10.104.7.12",
+				},
+			},
+		},
+	}
 
 	coll := New(Config{
-		Interval: 0,
-		NodeName: "",
+		Interval:   time.Second,
+		NodeName:   "n1",
+		CacheItems: 1000,
 	}, log, kubeWatcher, connTracker)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	runerr := make(chan error)
+	var metrics []PodNetworkMetric
+	done := make(chan struct{})
 	go func() {
-		runerr <- coll.Start(ctx)
+		for {
+			select {
+			case e, closed := <-coll.GetMetricsChan():
+				metrics = append(metrics, e)
+				fmt.Println(e, closed)
+				if closed {
+					done <- struct{}{}
+					return
+				}
+			}
+		}
 	}()
+
+	err := coll.run()
+	r.NoError(err)
+	err = coll.run()
+	r.NoError(err)
+	close(coll.metricsChan)
+	<-done
+
+	r.Len(metrics, 1)
+	// TODO: More asserts and more entries.
 }
 
 func TestGroupPodConns(t *testing.T) {
@@ -57,8 +121,7 @@ func TestGroupPodConns(t *testing.T) {
 			Reply:     false,
 		},
 	}
-	grouped, err := groupConns(entries)
-	r.NoError(err)
+	grouped := groupConns(entries)
 	r.Len(grouped, 1)
 	var item *groupedConn
 	for _, v := range grouped {
@@ -86,8 +149,14 @@ type mockKubeWatcher struct {
 }
 
 func (m *mockKubeWatcher) GetNodeByIP(ip string) (*corev1.Node, error) {
-	//TODO implement me
-	panic("implement me")
+	for _, node := range m.nodes {
+		for _, addr := range node.Status.Addresses {
+			if addr.Address == ip {
+				return node, nil
+			}
+		}
+	}
+	return nil, kube.ErrNotFound
 }
 
 func (m *mockKubeWatcher) GetPodByIP(ip string) (*corev1.Pod, error) {
