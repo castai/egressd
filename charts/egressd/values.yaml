@@ -1,0 +1,81 @@
+# Default values for egressd.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: ghcr.io/castai/egressd
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext:
+  privileged: true
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+dnsPolicy: ClusterFirstWithHostNet
+
+egressd:
+  conntrack: "nf" # Conntrack mode. Available values "nf" or "cilium"
+
+export:
+  enabled: true
+  image: timberio/vector:0.25.1-alpine
+  resources: {}
+  securityContext: {}
+  vectorConfig: |
+    sources:
+          logs:
+            type: file
+            ignore_older_secs: 600
+            include:
+              - /var/run/egressd/egressd.log
+            read_from: end
+
+    transforms:
+      events:
+        type: remap
+        inputs:
+          - logs
+        source: |-
+          . = parse_json!(string!(.message))
+
+    sinks:
+      vector_aggregator:
+        type: vector
+        inputs:
+          - events
+        address: vector-egressd-headless.egressd.svc.cluster.local:6000

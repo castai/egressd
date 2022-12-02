@@ -1,6 +1,0 @@
-10.104.7.12 -> 10.108.7.221:80 -> 10.104.7.5:80
-
-TCP IN 10.104.7.12:47394 -> 10.104.7.5:3000 expires=16920893 RxPackets=13 RxBytes=942 RxFlagsSeen=0x1b LastRxReport=16920854 TxPackets=11 TxBytes=42872 TxFlagsSeen=0x1b LastTxReport=16920854 Flags=0x0013 [ RxClosing TxClosing SeenNonSyn ] RevNAT=0 SourceSecurityID=42707 IfIndex=0
-TCP OUT 10.104.7.12:47394 -> 10.104.7.5:3000 expires=16920893 RxPackets=11 RxBytes=42872 RxFlagsSeen=0x1b LastRxReport=16920854 TxPackets=13 TxBytes=942 TxFlagsSeen=0x1b LastTxReport=16920854 Flags=0x0013 [ RxClosing TxClosing SeenNonSyn ] RevNAT=13 SourceSecurityID=42707 IfIndex=0
-TCP OUT 10.108.7.221:80 -> 10.104.7.12:47394 service expires=17005229 RxPackets=0 RxBytes=56 RxFlagsSeen=0x00 LastRxReport=0 TxPackets=0 TxBytes=0 TxFlagsSeen=0x1b LastTxReport=16920854 Flags=0x0012 [ TxClosing SeenNonSyn ] RevNAT=13 SourceSecurityID=0 IfIndex=0
-
