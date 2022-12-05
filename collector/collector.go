@@ -160,6 +160,8 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 			DstZone:      "",
 			TxBytes:      conn.txBytes,
 			TxPackets:    conn.txPackets,
+			RxBytes:      conn.rxBytes,
+			RxPackets:    conn.rxPackets,
 			Proto:        conntrack.ProtoString(conn.proto),
 			TS:           uint64(ts),
 		}
@@ -217,6 +219,8 @@ type groupedConn struct {
 	proto     uint8
 	txBytes   uint64
 	txPackets uint64
+	rxBytes   uint64
+	rxPackets uint64
 }
 
 func groupConns(conns []conntrack.Entry) map[uint64]*groupedConn {
@@ -235,6 +239,8 @@ func groupConns(conns []conntrack.Entry) map[uint64]*groupedConn {
 		}
 		group.txBytes += conn.TxBytes
 		group.txPackets += conn.TxPackets
+		group.rxBytes += conn.RxBytes
+		group.rxPackets += conn.RxPackets
 	}
 	return grouped
 }

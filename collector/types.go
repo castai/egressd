@@ -14,6 +14,8 @@ type PodNetworkMetric struct {
 	DstZone      string `json:"dst_zone"`
 	TxBytes      uint64 `json:"tx_bytes"`
 	TxPackets    uint64 `json:"tx_packets"`
+	RxBytes      uint64 `json:"rx_bytes"`
+	RxPackets    uint64 `json:"rx_packets"`
 	Proto        string `json:"proto"`
 	TS           uint64 `json:"ts"`
 }

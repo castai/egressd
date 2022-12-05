@@ -3,4 +3,4 @@ name: egressd
 description: Kubernetes aware network traffic monitoring
 type: application
 version: 0.1.0
-appVersion: "am1"
+appVersion: "f0bd83ef7a64224e87d918f84c67fba64d372b9b"

@@ -29,13 +29,17 @@ spec:
       initContainers:
         - name: egressd-init
           image: busybox:1.35.0
-          args:
-            - "/bin/echo"
-            - "1"
-            - "/hostproc/sys/net/netfilter/nf_conntrack_acct"
+          command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              /bin/echo "1" > /hostproc/sys/net/netfilter/nf_conntrack_acct
+          securityContext:
+            privileged: true
           volumeMounts:
             - mountPath: /hostproc/sys/net/netfilter
               name: netfilter
+              mountPropagation: Bidirectional
       {{- end }}
       containers:
         - name: egressd
