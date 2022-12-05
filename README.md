@@ -4,9 +4,14 @@ Kubernetes aware network traffic monitoring.
 
 ## How it works
 
-Egressd is Kubernetes DaemonSet. Pod running on each node collects conntrack records and adds Kubernetes context.
-On Kubernetes clusters with Cilium CNI egressd hooks into eBPF maps located at /sys/fs/bpf
-For other CNI it fetches conntrack records from /proc/sys/net/netfilter
+* DaemonSet pod starts on each node.
+* Conntrack entries are fetched for pods running on each at configured interval (5 seconds by default).
+  * If Cilium is used then conntrack records are fetched from eBPF maps located at host /sys/fs/bpf. These maps are created by Cilium.
+  * If Linux Netfilter Conntrack module is used then Netlink is used to get these records.
+* Records are reduced by source IP, destination, IP and protocol.
+* Kubernetes context is added including source and destination pods, nodes, node zones, ips.
+* Logs are written to logs file. This allows to setup logs processing tools for export to other systems.
+
 
 ## Example
 
