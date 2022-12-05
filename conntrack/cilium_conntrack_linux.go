@@ -11,7 +11,7 @@ import (
 	"inet.af/netaddr"
 )
 
-func listRecords(maps []interface{}) (map[netaddr.IP][]Entry, error) {
+func listRecords(maps []interface{}, filter EntriesFilter) (map[netaddr.IP][]Entry, error) {
 	entries := make(map[netaddr.IP][]Entry)
 
 	for _, m := range maps {
@@ -43,9 +43,11 @@ func listRecords(maps []interface{}) (map[netaddr.IP][]Entry, error) {
 				RxBytes:   val.RxBytes,
 				RxPackets: val.RxPackets,
 				Proto:     uint8(k.NextHeader),
-				Reply:     k.Flags&ctmap.TUPLE_F_IN != 0,
+				Ingress:   k.Flags&ctmap.TUPLE_F_IN != 0,
 			}
-			entries[record.Src.IP()] = append(entries[record.Src.IP()], record)
+			if filter(&record) {
+				entries[record.Src.IP()] = append(entries[record.Src.IP()], record)
+			}
 		}
 		if err = m.DumpWithCallback(cb); err != nil {
 			return nil, fmt.Errorf("error while collecting BPF map entries: %w", err)

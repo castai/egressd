@@ -1,0 +1,14 @@
+linters:
+  disable-all: true
+  enable:
+    - gosimple
+  presets:
+    - bugs
+    - performance
+    - unused
+
+run:
+  skip-dirs:
+    - .github
+    - charts
+    - examples

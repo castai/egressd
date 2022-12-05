@@ -4,12 +4,26 @@ loki:
   commonConfig:
     replication_factor: 1
   storage:
-    type: 'filesystem'
-
-write:
-  replicas: 1
-read:
-  replicas: 1
+    type: "filesystem"
 
 gateway:
   enabled: false
+
+test:
+  enabled: false
+
+monitoring:
+  dashboards:
+    enabled: false
+  rules:
+    enabled: false
+  alerts:
+    enabled: false
+  serviceMonitor:
+    enabled: false
+  selfMonitoring:
+    enabled: false
+    lokiCanary:
+      enabled: false
+    grafanaAgent:
+      installOperator: false

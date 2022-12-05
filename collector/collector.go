@@ -8,10 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/golang-lru/v2"
-
 	"github.com/castai/egressd/conntrack"
 	"github.com/castai/egressd/kube"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
@@ -85,7 +84,7 @@ func (a *Collector) run() error {
 		return err
 	}
 
-	conns, err := a.conntracker.ListEntries()
+	conns, err := a.conntracker.ListEntries(conntrack.EgressOnly())
 	if err != nil {
 		return err
 	}
@@ -128,6 +127,7 @@ func (a *Collector) run() error {
 
 func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 	for _, e := range entries {
+		e := e
 		hash := entryKey(&e)
 		a.processedEntriesCache.Add(hash, struct{}{})
 	}
@@ -136,6 +136,7 @@ func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []conntrack.Entry, ts int64) ([]PodNetworkMetric, error) {
 	newCons := make([]conntrack.Entry, 0)
 	for _, conn := range podConns {
+		conn := conn
 		hash := entryKey(&conn)
 		if _, found := a.processedEntriesCache.Get(hash); !found {
 			newCons = append(newCons, conn)
@@ -147,19 +148,22 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 	for _, conn := range grouped {
 		metric := PodNetworkMetric{
 			SrcIP:        conn.srcIP.String(),
-			DstIP:        conn.dstIP.String(),
 			SrcPod:       pod.Name,
 			SrcNamespace: pod.Namespace,
 			SrcNode:      pod.Spec.NodeName,
 			SrcZone:      "",
+			DstIP:        conn.dstIP.String(),
+			DstIPType:    ipType(conn.dstIP),
 			DstPod:       "",
 			DstNamespace: "",
 			DstNode:      "",
 			DstZone:      "",
 			TxBytes:      conn.txBytes,
 			TxPackets:    conn.txPackets,
+			RxBytes:      conn.rxBytes,
+			RxPackets:    conn.rxPackets,
 			Proto:        conntrack.ProtoString(conn.proto),
-			Ts:           uint64(ts),
+			TS:           uint64(ts),
 		}
 
 		srcNode, err := a.kubeWatcher.GetNodeByName(pod.Spec.NodeName)
@@ -215,15 +219,14 @@ type groupedConn struct {
 	proto     uint8
 	txBytes   uint64
 	txPackets uint64
+	rxBytes   uint64
+	rxPackets uint64
 }
 
 func groupConns(conns []conntrack.Entry) map[uint64]*groupedConn {
 	grouped := make(map[uint64]*groupedConn)
 	for _, conn := range conns {
-		// TODO: Fix this logic. For Cilium this is OK. For linux nf we actually want reply.
-		if conn.Reply {
-			continue
-		}
+		conn := conn
 		key := connGroupKey(&conn)
 		group, found := grouped[key]
 		if !found {
@@ -236,6 +239,8 @@ func groupConns(conns []conntrack.Entry) map[uint64]*groupedConn {
 		}
 		group.txBytes += conn.TxBytes
 		group.txPackets += conn.TxPackets
+		group.rxBytes += conn.RxBytes
+		group.rxPackets += conn.RxPackets
 	}
 	return grouped
 }
@@ -285,4 +290,11 @@ func entryKey(conn *conntrack.Entry) uint64 {
 
 func getNodeZone(node *corev1.Node) string {
 	return node.Labels["topology.kubernetes.io/zone"]
+}
+
+func ipType(ip netaddr.IP) string {
+	if ip.IsPrivate() {
+		return "private"
+	}
+	return "public"
 }

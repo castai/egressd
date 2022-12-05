@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -28,7 +27,7 @@ func TestCollector(t *testing.T) {
 			RxBytes:   20,
 			RxPackets: 2,
 			Proto:     6,
-			Reply:     false,
+			Ingress:   false,
 		},
 		{
 			Src:       netaddr.MustParseIPPort("10.104.7.12:40002"),
@@ -38,7 +37,7 @@ func TestCollector(t *testing.T) {
 			RxBytes:   20,
 			RxPackets: 2,
 			Proto:     6,
-			Reply:     false,
+			Ingress:   false,
 		},
 	}
 
@@ -72,17 +71,10 @@ func TestCollector(t *testing.T) {
 	var metrics []PodNetworkMetric
 	done := make(chan struct{})
 	go func() {
-		for {
-			select {
-			case e, closed := <-coll.GetMetricsChan():
-				metrics = append(metrics, e)
-				fmt.Println(e, closed)
-				if closed {
-					done <- struct{}{}
-					return
-				}
-			}
+		for e := range coll.GetMetricsChan() {
+			metrics = append(metrics, e)
 		}
+		done <- struct{}{}
 	}()
 
 	err := coll.run()
@@ -108,7 +100,7 @@ func TestGroupPodConns(t *testing.T) {
 			RxBytes:   20,
 			RxPackets: 2,
 			Proto:     6,
-			Reply:     false,
+			Ingress:   false,
 		},
 		{
 			Src:       netaddr.MustParseIPPort("10.104.7.12:40002"),
@@ -118,7 +110,7 @@ func TestGroupPodConns(t *testing.T) {
 			RxBytes:   20,
 			RxPackets: 2,
 			Proto:     6,
-			Reply:     false,
+			Ingress:   false,
 		},
 	}
 	grouped := groupConns(entries)
@@ -135,7 +127,7 @@ type mockConntrack struct {
 	entries map[netaddr.IP][]conntrack.Entry
 }
 
-func (m *mockConntrack) ListEntries() (map[netaddr.IP][]conntrack.Entry, error) {
+func (m *mockConntrack) ListEntries(filter conntrack.EntriesFilter) (map[netaddr.IP][]conntrack.Entry, error) {
 	return m.entries, nil
 }
 

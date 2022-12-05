@@ -174,6 +174,9 @@ func transformFunc(obj interface{}) (interface{}, error) {
 			NodeName:    t.Spec.NodeName,
 			HostNetwork: t.Spec.HostNetwork,
 		}
+		t.Status = corev1.PodStatus{
+			PodIP: t.Status.PodIP,
+		}
 		t.SetLabels(nil)
 		t.SetAnnotations(nil)
 		return t, nil

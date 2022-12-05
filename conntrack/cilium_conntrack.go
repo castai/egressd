@@ -4,19 +4,15 @@ import "inet.af/netaddr"
 
 func NewCiliumClient() (Client, error) {
 	maps := initMaps()
-	ctMaps := make([]interface{}, len(maps))
-	for i, m := range maps {
-		ctMaps[i] = m
-	}
-	return &ciliumClient{maps: ctMaps}, nil
+	return &ciliumClient{maps: maps}, nil
 }
 
 type ciliumClient struct {
 	maps []interface{}
 }
 
-func (c *ciliumClient) ListEntries() (map[netaddr.IP][]Entry, error) {
-	records, err := listRecords(c.maps)
+func (c *ciliumClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]Entry, error) {
+	records, err := listRecords(c.maps, filter)
 	if err != nil {
 		return nil, err
 	}

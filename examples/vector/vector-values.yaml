@@ -32,7 +32,7 @@ customConfig:
       type: loki
       inputs:
         - vector
-      endpoint: "http://loki-write-headless.egressd.svc.cluster.local:3100"
+      endpoint: "http://loki-headless.egressd.svc.cluster.local:3100"
       compression: "snappy"
       encoding:
         codec: json

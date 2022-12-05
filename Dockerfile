@@ -3,6 +3,9 @@ ARG UBUNTU_IMAGE=docker.io/library/ubuntu:22.04@sha256:4b1d0c4a2d2aaf63b37111f34
 
 FROM ${CILIUM_BPFTOOL_IMAGE} as bpftool-dist
 
-FROM gke.gcr.io/cilium/cilium:v1.11.1-gke3.8.1
+FROM ${UBUNTU_IMAGE}
+# libelf is needed for bpftool. In the feature we may remove this dep by using low level ebpf maps. Currently we import cilium packages which uses bpftool.
+RUN apt update && apt install -y libelf-dev
+COPY --from=bpftool-dist /usr/local /usr/local
 COPY ./bin/egressd /usr/local/bin/egressd
 CMD ["/usr/local/bin/egressd"]

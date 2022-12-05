@@ -22,17 +22,24 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "egressd.serviceAccountName" . }}
+      hostNetwork: true
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      hostNetwork: true
       {{- if eq .Values.egressd.conntrack "nf"}}
       initContainers:
         - name: egressd-init
           image: busybox:1.35.0
-          args:
-            - "/bin/echo"
-            - "1"
-            - "/proc/sys/net/netfilter/nf_conntrack_acct"
+          command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              /bin/echo "1" > /hostproc/sys/net/netfilter/nf_conntrack_acct
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /hostproc/sys/net/netfilter
+              name: netfilter
+              mountPropagation: Bidirectional
       {{- end }}
       containers:
         - name: egressd
@@ -42,18 +49,16 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          args:
+            - "/usr/local/bin/egressd"
+            - "-conntrack-mode"
+            - "{{.Values.egressd.conntrack}}"
           env:
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
-          {{- if eq .Values.egressd.conntrack "nf"}}
-            - mountPath: /hostnet
-              name: nf-conntrack
-            - mountPath: /hostproc/sys/net/netfilter
-              name: netfilter
-          {{- end }}
           {{- if eq .Values.egressd.conntrack "cilium"}}
             - mountPath: /sys/fs/bpf
               mountPropagation: HostToContainer
@@ -87,9 +92,6 @@ spec:
       dnsPolicy: {{.Values.dnsPolicy}}
       volumes:
       {{- if eq .Values.egressd.conntrack "nf"}}
-        - name: nf-conntrack
-          hostPath:
-            path: /proc/net
         - name: netfilter
           hostPath:
             path: /proc/sys/net/netfilter
