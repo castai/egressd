@@ -11,4 +11,4 @@ run:
   skip-dirs:
     - .github
     - charts
-    - exampes
+    - examples

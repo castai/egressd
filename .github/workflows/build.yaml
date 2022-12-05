@@ -81,7 +81,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: ${{ github.event_name == 'pull_request' }}
-          tags: ghcr.io/castai/egressd:${{ github.sha }}
+          tags: ghcr.io/castai/egressd/egressd:${{ github.sha }}
 
 
       - name: Build and push main
@@ -91,7 +91,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/castai/egressd:${{ github.sha }}
+          tags: ghcr.io/castai/egressd/egressd:${{ github.sha }}
 
       - name: Build and push release
         if: github.event_name == 'release'
@@ -101,12 +101,12 @@ jobs:
           push: true
           file: ./Dockerfile
           tags: |
-            ghcr.io/castai/egressd:${{ github.sha }}
-            ghcr.io/castai/egressd:latest
+            ghcr.io/castai/egressd/egressd:${{ github.sha }}
+            ghcr.io/castai/egressd/egressd:latest
 
       - name: FOSSA scan docker image (agent)
         if: github.event_name == 'release'
         uses: fossas/fossa-action@v1
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
-          container: ghcr.io/castai/egressd:${{ env.RELEASE_TAG }}
+          container: ghcr.io/castai/egressd/egressd:${{ env.RELEASE_TAG }}

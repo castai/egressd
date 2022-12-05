@@ -2,7 +2,7 @@
 # Declare variables to be passed into your templates.
 
 image:
-  repository: ghcr.io/castai/egressd
+  repository: ghcr.io/castai/egressd/egressd
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
