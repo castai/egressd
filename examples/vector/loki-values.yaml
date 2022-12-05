@@ -5,6 +5,11 @@ loki:
     replication_factor: 1
   storage:
     type: "filesystem"
+  structuredConfig:
+    frontend:
+      max_outstanding_per_tenant: 6000
+    query_scheduler:
+      max_outstanding_requests_per_tenant: 6000
 
 gateway:
   enabled: false
