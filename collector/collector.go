@@ -148,11 +148,12 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 	for _, conn := range grouped {
 		metric := PodNetworkMetric{
 			SrcIP:        conn.srcIP.String(),
-			DstIP:        conn.dstIP.String(),
 			SrcPod:       pod.Name,
 			SrcNamespace: pod.Namespace,
 			SrcNode:      pod.Spec.NodeName,
 			SrcZone:      "",
+			DstIP:        conn.dstIP.String(),
+			DstIPType:    ipType(conn.dstIP),
 			DstPod:       "",
 			DstNamespace: "",
 			DstNode:      "",
@@ -283,4 +284,11 @@ func entryKey(conn *conntrack.Entry) uint64 {
 
 func getNodeZone(node *corev1.Node) string {
 	return node.Labels["topology.kubernetes.io/zone"]
+}
+
+func ipType(ip netaddr.IP) string {
+	if ip.IsPrivate() {
+		return "private"
+	}
+	return "public"
 }

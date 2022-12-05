@@ -7,6 +7,7 @@ type PodNetworkMetric struct {
 	SrcNode      string `json:"src_node"`
 	SrcZone      string `json:"src_zone"`
 	DstIP        string `json:"dst_ip"`
+	DstIPType    string `json:"dst_ip_type"`
 	DstPod       string `json:"dst_pod"`
 	DstNamespace string `json:"dst_namespace"`
 	DstNode      string `json:"dst_node"`
