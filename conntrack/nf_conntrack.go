@@ -25,7 +25,7 @@ type netfilterClient struct {
 	nfct *ct.Nfct
 }
 
-func (n *netfilterClient) ListEntries() (map[netaddr.IP][]Entry, error) {
+func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]Entry, error) {
 	sessions, err := n.nfct.Dump(ct.Conntrack, ct.IPv4)
 	if err != nil {
 		return nil, fmt.Errorf("dumping nfct sessions: %w", err)
@@ -45,7 +45,7 @@ func (n *netfilterClient) ListEntries() (map[netaddr.IP][]Entry, error) {
 		originCounter := sess.CounterOrigin
 		reply := sess.Reply
 		replyCounter := sess.CounterReply
-		in := Entry{
+		egress := Entry{
 			Src:       netaddr.IPPortFrom(ipFromStdIP(*origin.Src), *origin.Proto.SrcPort),
 			Dst:       netaddr.IPPortFrom(ipFromStdIP(*origin.Dst), *origin.Proto.DstPort),
 			TxBytes:   *originCounter.Bytes,
@@ -53,11 +53,12 @@ func (n *netfilterClient) ListEntries() (map[netaddr.IP][]Entry, error) {
 			RxBytes:   *replyCounter.Bytes,
 			RxPackets: *replyCounter.Packets,
 			Proto:     *origin.Proto.Number,
-			Reply:     false,
+			Ingress:   false,
 		}
-		res[in.Src.IP()] = append(res[in.Src.IP()], in)
-
-		out := Entry{
+		if filter(&egress) {
+			res[egress.Src.IP()] = append(res[egress.Src.IP()], egress)
+		}
+		ingress := Entry{
 			Src:       netaddr.IPPortFrom(ipFromStdIP(*reply.Src), *reply.Proto.SrcPort),
 			Dst:       netaddr.IPPortFrom(ipFromStdIP(*reply.Dst), *reply.Proto.DstPort),
 			TxBytes:   *replyCounter.Bytes,
@@ -65,9 +66,29 @@ func (n *netfilterClient) ListEntries() (map[netaddr.IP][]Entry, error) {
 			RxBytes:   *originCounter.Bytes,
 			RxPackets: *originCounter.Packets,
 			Proto:     *reply.Proto.Number,
-			Reply:     true,
+			Ingress:   true,
 		}
-		res[out.Src.IP()] = append(res[out.Src.IP()], out)
+		if filter(&ingress) {
+			res[ingress.Src.IP()] = append(res[ingress.Src.IP()], ingress)
+		}
+
+		// ClusterIP nat. Add as egress, but use destination as ingress source.
+		if egress.Dst != ingress.Src {
+			egress2 := Entry{
+				Src:       egress.Src,
+				Dst:       ingress.Src,
+				TxBytes:   egress.TxBytes,
+				TxPackets: egress.TxPackets,
+				RxBytes:   egress.RxBytes,
+				RxPackets: egress.RxPackets,
+				Proto:     egress.Proto,
+				Ingress:   egress.Ingress,
+			}
+			if filter(&egress2) {
+				res[egress2.Src.IP()] = append(res[egress2.Src.IP()], egress2)
+			}
+		}
+
 	}
 	if skippedEntriesCount > 0 {
 		n.log.Warnf("skipped %d conntrack entries", skippedEntriesCount)

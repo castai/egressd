@@ -8,10 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/golang-lru/v2"
-
 	"github.com/castai/egressd/conntrack"
 	"github.com/castai/egressd/kube"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
@@ -85,7 +84,7 @@ func (a *Collector) run() error {
 		return err
 	}
 
-	conns, err := a.conntracker.ListEntries()
+	conns, err := a.conntracker.ListEntries(conntrack.EgressOnly())
 	if err != nil {
 		return err
 	}
@@ -128,6 +127,7 @@ func (a *Collector) run() error {
 
 func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 	for _, e := range entries {
+		e := e
 		hash := entryKey(&e)
 		a.processedEntriesCache.Add(hash, struct{}{})
 	}
@@ -136,6 +136,7 @@ func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []conntrack.Entry, ts int64) ([]PodNetworkMetric, error) {
 	newCons := make([]conntrack.Entry, 0)
 	for _, conn := range podConns {
+		conn := conn
 		hash := entryKey(&conn)
 		if _, found := a.processedEntriesCache.Get(hash); !found {
 			newCons = append(newCons, conn)
@@ -159,7 +160,7 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 			TxBytes:      conn.txBytes,
 			TxPackets:    conn.txPackets,
 			Proto:        conntrack.ProtoString(conn.proto),
-			Ts:           uint64(ts),
+			TS:           uint64(ts),
 		}
 
 		srcNode, err := a.kubeWatcher.GetNodeByName(pod.Spec.NodeName)
@@ -220,10 +221,7 @@ type groupedConn struct {
 func groupConns(conns []conntrack.Entry) map[uint64]*groupedConn {
 	grouped := make(map[uint64]*groupedConn)
 	for _, conn := range conns {
-		// TODO: Fix this logic. For Cilium this is OK. For linux nf we actually want reply.
-		if conn.Reply {
-			continue
-		}
+		conn := conn
 		key := connGroupKey(&conn)
 		group, found := grouped[key]
 		if !found {

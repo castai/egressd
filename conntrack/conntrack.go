@@ -14,19 +14,25 @@ type Entry struct {
 	RxBytes   uint64
 	RxPackets uint64
 	Proto     uint8
-	Reply     bool
+	Ingress   bool
 }
 
-type EntriesFilter func(e Entry) bool
+type EntriesFilter func(e *Entry) bool
 
 func All() EntriesFilter {
-	return func(e Entry) bool {
+	return func(e *Entry) bool {
 		return true
 	}
 }
 
+func EgressOnly() EntriesFilter {
+	return func(e *Entry) bool {
+		return !e.Ingress
+	}
+}
+
 type Client interface {
-	ListEntries() (map[netaddr.IP][]Entry, error)
+	ListEntries(filter EntriesFilter) (map[netaddr.IP][]Entry, error)
 	Close() error
 }
 

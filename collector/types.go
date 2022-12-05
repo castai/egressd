@@ -14,5 +14,5 @@ type PodNetworkMetric struct {
 	TxBytes      uint64 `json:"tx_bytes"`
 	TxPackets    uint64 `json:"tx_packets"`
 	Proto        string `json:"proto"`
-	Ts           uint64 `json:"ts"`
+	TS           uint64 `json:"ts"`
 }

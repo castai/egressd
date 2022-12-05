@@ -42,6 +42,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          args:
+            - "/usr/local/bin/egressd"
+            - "-conntrack-mode"
+            - "{{.Values.egressd.conntrack}}"
           env:
             - name: NODE_NAME
               valueFrom:

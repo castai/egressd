@@ -26,10 +26,18 @@ import (
 
 var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
-	cilium            = flag.Bool("cilium", false, "")
+	conntrackMode     = flag.String("conntrack-mode", "nf", "")
 	interval          = flag.Duration("interval", 5*time.Second, "")
+	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
+)
+
+// These should be set via `go build` during a release.
+var (
+	GitCommit = "undefined"
+	GitRef    = "no-ref"
+	Version   = "local"
 )
 
 func main() {
@@ -51,7 +59,7 @@ func main() {
 	go func() {
 		mux := http.NewServeMux()
 		addPprofHandlers(mux)
-		http.ListenAndServe(":6060", mux)
+		_ = http.ListenAndServe(*httpAddr, mux) //nolint:gosec
 	}()
 
 	if err := run(ctx, log); err != nil && !errors.Is(err, context.Canceled) {
@@ -60,6 +68,8 @@ func main() {
 }
 
 func run(ctx context.Context, log logrus.FieldLogger) error {
+	log.Infof("running egressd, version=%s, commit=%s, ref=%s", Version, GitCommit, GitRef)
+
 	restconfig, err := retrieveKubeConfig(log, *kubeconfig)
 	if err != nil {
 		return err
@@ -72,10 +82,13 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 
 	kubeWatcher := kube.NewWatcher(clientset)
 	var conntracker conntrack.Client
-	if *cilium {
-		conntracker, err = conntrack.NewCiliumClient()
-	} else {
+	switch *conntrackMode {
+	case "nf":
 		conntracker, err = conntrack.NewNetfilterClient(log)
+	case "cilium":
+		conntracker, err = conntrack.NewCiliumClient()
+	default:
+		return fmt.Errorf("unsupported conntract-mode %q", *conntrackMode)
 	}
 	defer conntracker.Close()
 	if err != nil {
@@ -96,7 +109,11 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 			MaxBackups:          3,
 			Compress:            false,
 		}, log, coll)
-		go export.Start(ctx)
+		go func() {
+			if err := export.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Errorf("exporter failed: %v", err)
+			}
+		}()
 	}
 
 	return coll.Start(ctx)
