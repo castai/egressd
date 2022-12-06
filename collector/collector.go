@@ -74,7 +74,7 @@ func (a *Collector) Start(ctx context.Context) error {
 			if err := a.run(); err != nil {
 				a.log.Errorf("collect error: %v", err)
 			} else {
-				a.log.Debugf("collection done in %s", time.Now().Sub(start))
+				a.log.Debugf("collection done in %s", time.Since(start))
 			}
 		}
 	}
