@@ -1,7 +1,14 @@
 linters:
-  disable-all: true
   enable:
     - gosimple
+  disable:
+    - scopelint
+    - deadcode
+    - maligned
+    - structcheck
+    - varcheck
+    - prealloc
+    - contextcheck
   presets:
     - bugs
     - performance

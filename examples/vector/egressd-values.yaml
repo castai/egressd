@@ -1,4 +1,4 @@
 image:
-  tag: "350c4d95c777b232d2b6c28772955e1018d8e97c"
+  tag: "baf6ec4aa525e87c87b2a8a97f51787b0f44c4f8"
 egressd:
   conntrack: "nf"

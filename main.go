@@ -16,6 +16,7 @@ import (
 	"github.com/castai/egressd/conntrack"
 	"github.com/castai/egressd/exporter"
 	"github.com/castai/egressd/kube"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -59,6 +60,7 @@ func main() {
 	go func() {
 		mux := http.NewServeMux()
 		addPprofHandlers(mux)
+		mux.Handle("/metrics", promhttp.Handler())
 		_ = http.ListenAndServe(*httpAddr, mux) //nolint:gosec
 	}()
 

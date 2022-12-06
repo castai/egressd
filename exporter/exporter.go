@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/castai/egressd/collector"
+	"github.com/castai/egressd/metrics"
 	"github.com/cilium/lumberjack/v2"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
@@ -49,6 +50,7 @@ func (e *Exporter) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case metric := <-e.metrics.GetMetricsChan():
+			metrics.IncExportedEvents()
 			if err := encoder.Encode(metric); err != nil {
 				e.log.Errorf("writing metric to logs: %v", err)
 			}
