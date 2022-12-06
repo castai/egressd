@@ -17,27 +17,38 @@ customConfig:
       type: vector
       version: "2"
 
+  transforms:
+    tx_bytes_logs:
+      type: remap
+      inputs:
+        - vector
+      source: |-
+        del(.tx_packets)
+        del(.rx_bytes)
+        del(.rx_packets)
+        del(.ts)
+
   sinks:
     prom_exporter:
       type: prometheus_exporter
       inputs: [ internal_metrics ]
       address: 0.0.0.0:9090
-    stdout:
-      type: console
-      inputs:
-        - vector
-      encoding:
-        codec: json
-    loki:
+#    stdout:
+#      type: console
+#      inputs:
+#        - vector
+#      encoding:
+#        codec: json
+    loki_tx_bytes_logs:
       type: loki
       inputs:
-        - vector
+        - tx_bytes_logs
       endpoint: "http://loki-headless.egressd.svc.cluster.local:3100"
       compression: "snappy"
       encoding:
         codec: json
       labels:
-        forwarder: vector
+        forwarder: vector_tx_bytes
         src_pod: '{{ "{{ src_pod }}" }}'
         src_namespace: '{{ "{{ src_namespace }}" }}'
         src_node: '{{ "{{ src_node }}" }}'
@@ -47,4 +58,3 @@ customConfig:
         proto: '{{ "{{ proto }}" }}'
       batch:
         timeout_secs: 3
-

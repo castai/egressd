@@ -24,14 +24,14 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 173,
   "links": [],
   "liveNow": false,
   "panels": [
     {
       "datasource": {
         "type": "loki",
-        "uid": "SfeGv5FVz"
+        "uid": "v_yAqaKVk"
       },
       "fieldConfig": {
         "defaults": {
@@ -93,6 +93,7 @@
         "y": 0
       },
       "id": 2,
+      "maxDataPoints": 500,
       "options": {
         "legend": {
           "calcs": [],
@@ -109,10 +110,10 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "SfeGv5FVz"
+            "uid": "v_yAqaKVk"
           },
           "editorMode": "code",
-          "expr": "sum(rate({forwarder=\"vector\", dst_pod!=\"\"} | json | unwrap tx_bytes [1m])) by (src_pod, dst_pod)",
+          "expr": "sum(rate_counter({forwarder=\"vector_tx_bytes\", dst_pod!=\"\"} | json | unwrap tx_bytes [1m])) by (src_pod, dst_pod)",
           "legendFormat": "{{src_pod}} -> {{dst_pod}}",
           "queryType": "range",
           "refId": "A"
@@ -124,7 +125,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "SfeGv5FVz"
+        "uid": "v_yAqaKVk"
       },
       "fieldConfig": {
         "defaults": {
@@ -186,6 +187,7 @@
         "y": 0
       },
       "id": 3,
+      "maxDataPoints": 500,
       "options": {
         "legend": {
           "calcs": [],
@@ -202,10 +204,10 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "SfeGv5FVz"
+            "uid": "v_yAqaKVk"
           },
           "editorMode": "code",
-          "expr": "sum(rate({forwarder=\"vector\", dst_pod!=\"\"} | json | unwrap tx_bytes [1m])) by (src_namespace, dst_namespace)",
+          "expr": "sum(rate_counter({forwarder=\"vector_tx_bytes\", dst_pod!=\"\"} | json | unwrap tx_bytes [1m])) by (src_namespace, dst_namespace)",
           "legendFormat": "{{src_namespace}} -> {{dst_namespace}}",
           "queryType": "range",
           "refId": "A"
@@ -217,7 +219,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "SfeGv5FVz"
+        "uid": "v_yAqaKVk"
       },
       "fieldConfig": {
         "defaults": {
@@ -274,7 +276,7 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 12
       },
@@ -295,10 +297,10 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "SfeGv5FVz"
+            "uid": "v_yAqaKVk"
           },
           "editorMode": "code",
-          "expr": "sum(rate({forwarder=\"vector\", dst_pod!=\"\"} | json | unwrap tx_bytes [1m])) by (src_zone, dst_zone)",
+          "expr": "sum(rate_counter({forwarder=\"vector_tx_bytes\", dst_pod!=\"\"} | json | unwrap tx_bytes [1m])) by (src_zone, dst_zone)",
           "legendFormat": "{{src_zone}} -> {{dst_zone}}",
           "queryType": "range",
           "refId": "A"
@@ -310,7 +312,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "SfeGv5FVz"
+        "uid": "v_yAqaKVk"
       },
       "fieldConfig": {
         "defaults": {
@@ -367,8 +369,8 @@
       },
       "gridPos": {
         "h": 12,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 8,
         "y": 12
       },
       "id": 5,
@@ -388,16 +390,109 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "SfeGv5FVz"
+            "uid": "v_yAqaKVk"
           },
           "editorMode": "code",
-          "expr": "sum(rate({forwarder=\"vector\"} | json | unwrap tx_bytes [1m])) by (dst_ip)",
+          "expr": "sum(rate_counter({forwarder=\"vector_tx_bytes\"} | json | unwrap tx_bytes [1m])) by (dst_ip_type)",
           "legendFormat": "{{dst_ip}}",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Egress  per IP",
+      "title": "Egress per IP type",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "v_yAqaKVk"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "v_yAqaKVk"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate_counter({forwarder=\"vector_tx_bytes\"} | json | unwrap tx_bytes [1m])) by (proto)",
+          "legendFormat": "{{dst_ip}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Pods Egress by protocol",
       "type": "timeseries"
     }
   ],
@@ -415,6 +510,6 @@
   "timezone": "",
   "title": "Egressd",
   "uid": "eLgGdcK4k",
-  "version": 3,
+  "version": 6,
   "weekStart": ""
 }
