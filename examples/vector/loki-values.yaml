@@ -10,6 +10,8 @@ loki:
       max_outstanding_per_tenant: 6000
     query_scheduler:
       max_outstanding_requests_per_tenant: 6000
+  limits_config:
+    retention_period: 6h
 
 gateway:
   enabled: false
