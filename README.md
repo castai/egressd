@@ -17,6 +17,7 @@ Kubernetes aware network traffic monitoring.
 * Pods running on host network are not tracked. Conntrack records do not have process ID which makes it hard to map host network ips into actual pods. In the feature we should track all listening and allocated ports for processes and coordinate between egressd instances.
 * Docker image is 200MB due to use of Go github.com/cilium/cilium packages which requires bpftool and libelf. In the feature this can be replaced with github.com/cilium/ebpf for reading eBPF maps.
 * When running with Linux conntrack, network flows are tracked only if stats are enabled. Init container enables these stats, but you may need to reload already running workloads manually.
+* Currently each pod runs on hostNetwork and priviledged mode. For linux conntrack this can be removed by parsing mounted `/proc/net/nf_conntrack` instead of using netlink. For cilium priviledged mode is still needed to read eBPF maps.
 
 ## Example
 
