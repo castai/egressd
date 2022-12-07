@@ -1,12 +1,14 @@
 package exporter
 
 import (
+	"bytes"
 	"context"
+	"strconv"
+	"sync"
 
 	"github.com/castai/egressd/collector"
 	"github.com/castai/egressd/metrics"
 	"github.com/cilium/lumberjack/v2"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -43,17 +45,52 @@ func (e *Exporter) Start(ctx context.Context) error {
 		Compress:   e.cfg.Compress,
 	}
 
-	encoder := jsoniter.NewEncoder(writer)
-
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case metric := <-e.metrics.GetMetricsChan():
 			metrics.IncExportedEvents()
-			if err := encoder.Encode(metric); err != nil {
+			if _, err := writer.Write(marshalJSON(&metric)); err != nil {
 				e.log.Errorf("writing metric to logs: %v", err)
 			}
 		}
 	}
+}
+
+var pool = sync.Pool{
+	New: func() interface{} {
+		return bytes.NewBuffer([]byte{})
+	},
+}
+
+func marshalJSON(m *collector.PodNetworkMetric) []byte {
+	buf := pool.Get().(*bytes.Buffer)
+	buf.Reset()
+
+	buf.WriteByte('\n')
+	buf.WriteByte('{')
+	buf.WriteString(`"src_ip":"` + m.SrcIP + `"`)
+	buf.WriteString(`,"src_pod":"` + m.SrcPod + `"`)
+	buf.WriteString(`,"src_namespace":"` + m.SrcNamespace + `"`)
+	buf.WriteString(`,"src_node":"` + m.SrcNode + `"`)
+	buf.WriteString(`,"src_zone":"` + m.SrcZone + `"`)
+	buf.WriteString(`,"dst_ip":"` + m.DstIP + `"`)
+	buf.WriteString(`,"dst_ip_type":"` + m.DstIPType + `"`)
+	if m.DstPod != "" {
+		buf.WriteString(`,"dst_pod":"` + m.DstPod + `"`)
+		buf.WriteString(`,"dst_namespace":"` + m.DstNamespace + `"`)
+		buf.WriteString(`,"dst_node":"` + m.DstNode + `"`)
+		buf.WriteString(`,"dst_zone":"` + m.DstZone + `"`)
+	}
+	buf.WriteString(`,"tx_bytes":` + strconv.Itoa(int(m.TxBytes)))
+	buf.WriteString(`,"tx_packets":` + strconv.Itoa(int(m.TxPackets)))
+	buf.WriteString(`,"rx_bytes":` + strconv.Itoa(int(m.RxBytes)))
+	buf.WriteString(`,"rx_packets":` + strconv.Itoa(int(m.RxPackets)))
+	buf.WriteString(`,"proto":"` + m.Proto + `"`)
+	buf.WriteString(`,"ts":` + strconv.Itoa(int(m.TS)))
+	buf.WriteByte('}')
+
+	pool.Put(buf)
+	return buf.Bytes()
 }

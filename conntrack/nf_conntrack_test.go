@@ -16,7 +16,7 @@ func TestNetfilterConntrack(t *testing.T) {
 	records := `ipv4     2 tcp      6 86391 ESTABLISHED src=127.0.0.1 dst=127.0.0.1 sport=36350 dport=10231 src=127.0.0.1 dst=127.0.0.1 sport=10231 dport=36350 [ASSURED] mark=0 zone=0 use=2
 ipv4     2 tcp      6 74 TIME_WAIT src=169.254.169.254 dst=35.236.111.222 sport=34410 dport=10256 packets=6 bytes=423 src=35.236.111.222 dst=169.254.169.254 sport=10256 dport=34410 packets=4 bytes=507 [ASSURED] mark=0 zone=0 use=2
 ipv4     2 tcp      6 76 TIME_WAIT src=10.20.1.1 dst=10.30.1.6 sport=49180 dport=19090 packets=5 bytes=377 src=10.20.1.6 dst=10.20.1.1 sport=19090 dport=49180 packets=5 bytes=425 [ASSURED] mark=0 zone=0 use=2
-ipv4     2 tcp      6 13 TIME_WAIT src=10.20.1.2 dst=10.30.1.7 sport=49180 dport=19090 packets=5 bytes=377 src=10.20.1.5 dst=10.20.1.2 sport=19090 dport=49180 packets=5 bytes=425 [ASSURED] mark=0 zone=0 use=2
+ipv4     2 tcp      6 13 TIME_WAIT src=10.20.1.3 dst=10.30.1.7 sport=49180 dport=19090 packets=5 bytes=377 src=10.20.1.5 dst=10.20.1.3 sport=19090 dport=49180 packets=5 bytes=425 [ASSURED] mark=0 zone=0 use=2
 `
 	client := NewNetfilterClient(log, func() (io.ReadCloser, error) {
 		return &mockConntrackReader{
@@ -64,6 +64,21 @@ func TestNetfilterLineParser(t *testing.T) {
 			line: "ipv4     2 tcp      6 74 TIME_WAIT src=169.254.169.254 dst=35.236.111.222 sport=34410 dport=10256 packets=6 bytes=423 src=35.236.111.222 dst=169.254.169.254 sport=10256 dport=34410 packets=4 bytes=507 [ASSURED] mark=0 zone=0 use=2",
 			expected: conntrackEntry{
 				proto:     6,
+				reqSrc:    netaddr.MustParseIPPort("169.254.169.254:34410"),
+				reqDst:    netaddr.MustParseIPPort("35.236.111.222:10256"),
+				respSrc:   netaddr.MustParseIPPort("35.236.111.222:10256"),
+				respDst:   netaddr.MustParseIPPort("169.254.169.254:34410"),
+				txPackets: 6,
+				txBytes:   423,
+				rxPackets: 4,
+				rxBytes:   507,
+			},
+		},
+		{
+			name: "parse udp",
+			line: "ipv4     2 udp      17 74 src=169.254.169.254 dst=35.236.111.222 sport=34410 dport=10256 packets=6 bytes=423 src=35.236.111.222 dst=169.254.169.254 sport=10256 dport=34410 packets=4 bytes=507 [ASSURED] mark=0 zone=0 use=2",
+			expected: conntrackEntry{
+				proto:     17,
 				reqSrc:    netaddr.MustParseIPPort("169.254.169.254:34410"),
 				reqDst:    netaddr.MustParseIPPort("35.236.111.222:10256"),
 				respSrc:   netaddr.MustParseIPPort("35.236.111.222:10256"),

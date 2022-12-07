@@ -35,8 +35,11 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]En
 	res := make(map[netaddr.IP][]Entry, 0)
 	var count int
 	for scanner.Scan() {
-		// Split the line into fields
-		entry := parseConntrackLine(scanner.Text())
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		entry := parseConntrackLine(line)
 		count++
 		if entry.txBytes == 0 {
 			continue
@@ -110,7 +113,12 @@ func parseConntrackLine(line string) conntrackEntry {
 	_ = fields[2]                       // Transmission layer name (eg. tcp)
 	proto, _ := strconv.Atoi(fields[3]) // Transmission layer number (eg. 6)
 	_ = fields[4]                       // Seconds until entry is invalidated.
-	_ = fields[5]                       // Connection state.
+	maybeConnState := fields[5]         // Connection state. Optional.
+	fieldsStart := 6
+	if maybeConnState[0] == 's' && maybeConnState[1] == 'r' && maybeConnState[2] == 'c' {
+		// There is no state field. Start fields from 5 pos.
+		fieldsStart = 5
+	}
 
 	entry := conntrackEntry{
 		proto: uint8(proto),
@@ -118,7 +126,7 @@ func parseConntrackLine(line string) conntrackEntry {
 
 	var srcIP, dstIP, srcPort, dstPort, packets string
 	var reqAccDone bool
-	for _, field := range fields[6:] {
+	for _, field := range fields[fieldsStart:] {
 		index := strings.IndexByte(field, '=')
 		if index == -1 {
 			continue

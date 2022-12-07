@@ -8,10 +8,10 @@ type PodNetworkMetric struct {
 	SrcZone      string `json:"src_zone"`
 	DstIP        string `json:"dst_ip"`
 	DstIPType    string `json:"dst_ip_type"`
-	DstPod       string `json:"dst_pod"`
-	DstNamespace string `json:"dst_namespace"`
-	DstNode      string `json:"dst_node"`
-	DstZone      string `json:"dst_zone"`
+	DstPod       string `json:"dst_pod,omitempty"`
+	DstNamespace string `json:"dst_namespace,omitempty"`
+	DstNode      string `json:"dst_node,omitempty"`
+	DstZone      string `json:"dst_zone,omitempty"`
 	TxBytes      uint64 `json:"tx_bytes"`
 	TxPackets    uint64 `json:"tx_packets"`
 	RxBytes      uint64 `json:"rx_bytes"`
