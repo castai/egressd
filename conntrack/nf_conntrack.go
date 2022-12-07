@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/castai/egressd/metrics"
 	ct "github.com/florianl/go-conntrack"
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
@@ -30,6 +31,8 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]En
 	if err != nil {
 		return nil, fmt.Errorf("dumping nfct sessions: %w", err)
 	}
+
+	metrics.SetConntrackEntriesCount(float64(len(sessions)))
 
 	res := make(map[netaddr.IP][]Entry, 0)
 	var skippedEntriesCount int

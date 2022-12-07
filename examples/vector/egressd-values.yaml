@@ -1,4 +1,7 @@
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "6060"
 image:
-  tag: "350c4d95c777b232d2b6c28772955e1018d8e97c"
+  tag: "ec519aee7854435036cee0c9a31dd1ec5bafd987"
 egressd:
   conntrack: "nf"

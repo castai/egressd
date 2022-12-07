@@ -10,6 +10,7 @@ import (
 
 	"github.com/castai/egressd/conntrack"
 	"github.com/castai/egressd/kube"
+	"github.com/castai/egressd/metrics"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
@@ -68,11 +69,12 @@ func (a *Collector) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
+			start := time.Now()
 			a.log.Debug("collecting pod network metrics")
 			if err := a.run(); err != nil {
 				a.log.Errorf("collect error: %v", err)
 			} else {
-				a.log.Debug("collection done")
+				a.log.Debugf("collection done in %s", time.Since(start))
 			}
 		}
 	}
@@ -88,6 +90,7 @@ func (a *Collector) run() error {
 	if err != nil {
 		return err
 	}
+	metrics.SetConntrackActiveEntriesCount(float64(len(conns)))
 
 	ts := time.Now().UnixMilli() // Generate timestamp which is added for each metric during this cycle.
 	for _, pod := range pods {
@@ -116,6 +119,7 @@ func (a *Collector) run() error {
 			select {
 			case a.metricsChan <- metric:
 			default:
+				metrics.IncDroppedEvents()
 				a.log.Warning("dropping metric event, channel is full")
 			}
 		}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/castai/egressd/metrics"
 	"github.com/cilium/cilium/pkg/bpf"
 	"github.com/cilium/cilium/pkg/maps/ctmap"
 	"inet.af/netaddr"
@@ -14,6 +15,7 @@ import (
 func listRecords(maps []interface{}, filter EntriesFilter) (map[netaddr.IP][]Entry, error) {
 	entries := make(map[netaddr.IP][]Entry)
 
+	var fetchedCount int
 	for _, m := range maps {
 		m := m.(ctmap.CtMap)
 		path, err := m.Path()
@@ -27,6 +29,7 @@ func listRecords(maps []interface{}, filter EntriesFilter) (map[netaddr.IP][]Ent
 		}
 		defer m.Close()
 		cb := func(key bpf.MapKey, v bpf.MapValue) {
+			fetchedCount++
 			k := key.(ctmap.CtKey).ToHost().(*ctmap.CtKey4Global)
 			if k.NextHeader == 0 {
 				return
@@ -53,6 +56,7 @@ func listRecords(maps []interface{}, filter EntriesFilter) (map[netaddr.IP][]Ent
 			return nil, fmt.Errorf("error while collecting BPF map entries: %w", err)
 		}
 	}
+	metrics.SetConntrackEntriesCount(float64(fetchedCount))
 	return entries, nil
 }
 
