@@ -1,74 +1,68 @@
 package conntrack
 
 import (
-	"fmt"
-	"net"
+	"bufio"
+	"io"
+	"strconv"
+	"strings"
 
 	"github.com/castai/egressd/metrics"
-	ct "github.com/florianl/go-conntrack"
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 )
 
-func NewNetfilterClient(log logrus.FieldLogger) (Client, error) {
-	nfct, err := ct.Open(&ct.Config{})
-	if err != nil {
-		return nil, fmt.Errorf("opening nfct: %w", err)
-	}
+func NewNetfilterClient(log logrus.FieldLogger, conntrackOpener func() (io.ReadCloser, error)) Client {
 	return &netfilterClient{
-		log:  log,
-		nfct: nfct,
-	}, nil
+		log:             log,
+		conntrackOpener: conntrackOpener,
+	}
 }
 
 type netfilterClient struct {
-	log  logrus.FieldLogger
-	nfct *ct.Nfct
+	log             logrus.FieldLogger
+	conntrackOpener func() (io.ReadCloser, error)
 }
 
 func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]Entry, error) {
-	sessions, err := n.nfct.Dump(ct.Conntrack, ct.IPv4)
+	file, err := n.conntrackOpener()
 	if err != nil {
-		return nil, fmt.Errorf("dumping nfct sessions: %w", err)
+		return nil, err
 	}
+	defer file.Close()
 
-	metrics.SetConntrackEntriesCount(float64(len(sessions)))
+	scanner := bufio.NewScanner(file)
 
 	res := make(map[netaddr.IP][]Entry, 0)
-	var skippedEntriesCount int
-	for _, sess := range sessions {
-		if sess.Origin == nil || sess.Origin.Src == nil || sess.Origin.Proto == nil || sess.Origin.Proto.SrcPort == nil || sess.Origin.Proto.DstPort == nil ||
-			sess.Reply == nil || sess.Reply.Dst == nil || sess.Reply.Proto == nil || sess.Reply.Proto.SrcPort == nil || sess.Reply.Proto.DstPort == nil ||
-			sess.CounterOrigin == nil || sess.CounterReply == nil {
-			skippedEntriesCount++
+	var count int
+	for scanner.Scan() {
+		// Split the line into fields
+		entry := parseConntrackLine(scanner.Text())
+		count++
+		if entry.txBytes == 0 {
 			continue
 		}
 
-		origin := sess.Origin
-		originCounter := sess.CounterOrigin
-		reply := sess.Reply
-		replyCounter := sess.CounterReply
 		egress := Entry{
-			Src:       netaddr.IPPortFrom(ipFromStdIP(*origin.Src), *origin.Proto.SrcPort),
-			Dst:       netaddr.IPPortFrom(ipFromStdIP(*origin.Dst), *origin.Proto.DstPort),
-			TxBytes:   *originCounter.Bytes,
-			TxPackets: *originCounter.Packets,
-			RxBytes:   *replyCounter.Bytes,
-			RxPackets: *replyCounter.Packets,
-			Proto:     *origin.Proto.Number,
+			Src:       entry.reqSrc,
+			Dst:       entry.reqDst,
+			TxBytes:   entry.txBytes,
+			TxPackets: entry.txPackets,
+			RxBytes:   entry.rxBytes,
+			RxPackets: entry.rxPackets,
+			Proto:     entry.proto,
 			Ingress:   false,
 		}
 		if filter(&egress) {
 			res[egress.Src.IP()] = append(res[egress.Src.IP()], egress)
 		}
 		ingress := Entry{
-			Src:       netaddr.IPPortFrom(ipFromStdIP(*reply.Src), *reply.Proto.SrcPort),
-			Dst:       netaddr.IPPortFrom(ipFromStdIP(*reply.Dst), *reply.Proto.DstPort),
-			TxBytes:   *replyCounter.Bytes,
-			TxPackets: *replyCounter.Packets,
-			RxBytes:   *originCounter.Bytes,
-			RxPackets: *originCounter.Packets,
-			Proto:     *reply.Proto.Number,
+			Src:       entry.respSrc,
+			Dst:       entry.respDst,
+			TxBytes:   entry.txBytes,
+			TxPackets: entry.txPackets,
+			RxBytes:   entry.rxBytes,
+			RxPackets: entry.rxPackets,
+			Proto:     entry.proto,
 			Ingress:   true,
 		}
 		if filter(&ingress) {
@@ -91,22 +85,84 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]En
 				res[egress2.Src.IP()] = append(res[egress2.Src.IP()], egress2)
 			}
 		}
+	}
 
-	}
-	if skippedEntriesCount > 0 {
-		n.log.Warnf("skipped %d conntrack entries", skippedEntriesCount)
-	}
+	metrics.SetConntrackEntriesCount(float64(count))
 	return res, nil
 }
 
-func (n *netfilterClient) Close() error {
-	if n.nfct != nil {
-		return n.nfct.Close()
-	}
-	return nil
+type conntrackEntry struct {
+	proto     uint8
+	reqSrc    netaddr.IPPort
+	reqDst    netaddr.IPPort
+	respSrc   netaddr.IPPort
+	respDst   netaddr.IPPort
+	txBytes   uint64
+	txPackets uint64
+	rxBytes   uint64
+	rxPackets uint64
 }
 
-func ipFromStdIP(ip net.IP) netaddr.IP {
-	res, _ := netaddr.FromStdIP(ip)
-	return res
+func parseConntrackLine(line string) conntrackEntry {
+	fields := strings.Fields(line)
+	_ = fields[0]                       // Network layer protocol (eg. ipv4)
+	_ = fields[1]                       // Network layer protocol number (eg. 2)
+	_ = fields[2]                       // Transmission layer name (eg. tcp)
+	proto, _ := strconv.Atoi(fields[3]) // Transmission layer number (eg. 6)
+	_ = fields[4]                       // Seconds until entry is invalidated.
+	_ = fields[5]                       // Connection state.
+
+	entry := conntrackEntry{
+		proto: uint8(proto),
+	}
+
+	var srcIP, dstIP, srcPort, dstPort, packets string
+	var reqAccDone bool
+	for _, field := range fields[6:] {
+		index := strings.IndexByte(field, '=')
+		if index == -1 {
+			continue
+		}
+		key := field[:index]
+		val := field[index+1:]
+		switch key {
+		case "src":
+			srcIP = val
+		case "dst":
+			dstIP = val
+		case "sport":
+			srcPort = val
+		case "dport":
+			dstPort = val
+			srcAddr := parseIPPort(srcIP, srcPort)
+			dstAddr := parseIPPort(dstIP, dstPort)
+			if entry.reqSrc.IsZero() {
+				entry.reqSrc = srcAddr
+				entry.reqDst = dstAddr
+			} else {
+				entry.respSrc = srcAddr
+				entry.respDst = dstAddr
+			}
+		case "packets":
+			packets = val
+		case "bytes":
+			packetsNum, _ := strconv.Atoi(packets)
+			bytesNum, _ := strconv.Atoi(val)
+			if !reqAccDone {
+				reqAccDone = true
+				entry.txPackets = uint64(packetsNum)
+				entry.txBytes = uint64(bytesNum)
+			} else {
+				entry.rxPackets = uint64(packetsNum)
+				entry.rxBytes = uint64(bytesNum)
+			}
+		}
+	}
+
+	return entry
+}
+
+func parseIPPort(ip, port string) netaddr.IPPort {
+	portint, _ := strconv.Atoi(port)
+	return netaddr.IPPortFrom(netaddr.MustParseIP(ip), uint16(portint))
 }

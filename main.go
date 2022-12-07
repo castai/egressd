@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -26,8 +27,9 @@ import (
 )
 
 var (
-	kubeconfig        = flag.String("kubeconfig", "", "")
-	conntrackMode     = flag.String("conntrack-mode", "nf", "")
+	kubeconfig        = flag.String("kubeconfig", "", "Optional path to kube config. If not set in cluster config is used.")
+	conntrackMode     = flag.String("conntrack-mode", "nf", "Conntract mode. Available values: nf|cilium")
+	conntrackFilePath = flag.String("conntrack-file-path", "/proc/net/nf_conntrack", "File path conntrack file path. Should be set only wiht nf conntrack mode.")
 	interval          = flag.Duration("interval", 5*time.Second, "")
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
@@ -86,13 +88,14 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 	var conntracker conntrack.Client
 	switch *conntrackMode {
 	case "nf":
-		conntracker, err = conntrack.NewNetfilterClient(log)
+		conntracker = conntrack.NewNetfilterClient(log, func() (io.ReadCloser, error) {
+			return os.Open(*conntrackFilePath)
+		})
 	case "cilium":
-		conntracker, err = conntrack.NewCiliumClient()
+		conntracker = conntrack.NewCiliumClient()
 	default:
 		return fmt.Errorf("unsupported conntract-mode %q", *conntrackMode)
 	}
-	defer conntracker.Close()
 	if err != nil {
 		return err
 	}

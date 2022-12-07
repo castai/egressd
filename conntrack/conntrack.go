@@ -25,15 +25,21 @@ func All() EntriesFilter {
 	}
 }
 
-func EgressOnly() EntriesFilter {
+func EgressWithAccounting(srcIPs map[netaddr.IP]struct{}) EntriesFilter {
 	return func(e *Entry) bool {
-		return !e.Ingress
+		if e.Ingress {
+			return false
+		}
+		if e.TxPackets == 0 {
+			return false
+		}
+		_, found := srcIPs[e.Src.IP()]
+		return found
 	}
 }
 
 type Client interface {
 	ListEntries(filter EntriesFilter) (map[netaddr.IP][]Entry, error)
-	Close() error
 }
 
 var protoNames = map[uint8]string{

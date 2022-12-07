@@ -2,9 +2,9 @@ package conntrack
 
 import "inet.af/netaddr"
 
-func NewCiliumClient() (Client, error) {
+func NewCiliumClient() Client {
 	maps := initMaps()
-	return &ciliumClient{maps: maps}, nil
+	return &ciliumClient{maps: maps}
 }
 
 type ciliumClient struct {

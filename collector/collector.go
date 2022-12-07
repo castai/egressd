@@ -81,19 +81,15 @@ func (a *Collector) Start(ctx context.Context) error {
 }
 
 func (a *Collector) run() error {
-	pods, err := a.kubeWatcher.GetPodsByNode(a.cfg.NodeName)
+	nodePods, err := a.kubeWatcher.GetPodsByNode(a.cfg.NodeName)
 	if err != nil {
 		return err
 	}
 
-	conns, err := a.conntracker.ListEntries(conntrack.EgressOnly())
-	if err != nil {
-		return err
-	}
-	metrics.SetConntrackActiveEntriesCount(float64(len(conns)))
-
-	ts := time.Now().UnixMilli() // Generate timestamp which is added for each metric during this cycle.
-	for _, pod := range pods {
+	// Initial filter for possible pods.
+	filteredPods := make([]*corev1.Pod, 0)
+	podIPsLookup := make(map[netaddr.IP]struct{})
+	for _, pod := range nodePods {
 		podIP := pod.Status.PodIP
 		if podIP == "" {
 			continue
@@ -105,8 +101,20 @@ func (a *Collector) run() error {
 		if _, found := a.excludeNsMap[pod.Namespace]; found {
 			continue
 		}
+		filteredPods = append(filteredPods, pod)
+		podIPsLookup[netaddr.MustParseIP(podIP)] = struct{}{}
+	}
 
-		podConns, found := conns[netaddr.MustParseIP(podIP)]
+	// Fetch only egress conntrack entries for pods.
+	conns, err := a.conntracker.ListEntries(conntrack.EgressWithAccounting(podIPsLookup))
+	if err != nil {
+		return err
+	}
+	metrics.SetConntrackActiveEntriesCount(float64(len(conns)))
+
+	ts := time.Now().UnixMilli() // Generate timestamp which is added for each metric during this cycle.
+	for _, pod := range filteredPods {
+		podConns, found := conns[netaddr.MustParseIP(pod.Status.PodIP)]
 		if !found {
 			continue
 		}
