@@ -5,3 +5,6 @@ image:
   tag: "ec519aee7854435036cee0c9a31dd1ec5bafd987"
 egressd:
   conntrack: "nf"
+tolerations:
+  - key: scheduling.cast.ai/spot
+    operator: Exists
