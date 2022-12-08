@@ -68,7 +68,6 @@ func marshalJSON(m *collector.PodNetworkMetric) []byte {
 	buf := pool.Get().(*bytes.Buffer)
 	buf.Reset()
 
-	buf.WriteByte('\n')
 	buf.WriteByte('{')
 	buf.WriteString(`"src_ip":"` + m.SrcIP + `"`)
 	buf.WriteString(`,"src_pod":"` + m.SrcPod + `"`)
@@ -90,6 +89,7 @@ func marshalJSON(m *collector.PodNetworkMetric) []byte {
 	buf.WriteString(`,"proto":"` + m.Proto + `"`)
 	buf.WriteString(`,"ts":` + strconv.Itoa(int(m.TS)))
 	buf.WriteByte('}')
+	buf.WriteByte('\n')
 
 	pool.Put(buf)
 	return buf.Bytes()

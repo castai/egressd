@@ -1,12 +1,12 @@
 package exporter
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,14 +45,17 @@ func TestExporter(t *testing.T) {
 	timeout := time.After(2 * time.Second)
 	for {
 		select {
-		case <-time.After(10 * time.Millisecond):
+		case <-time.After(100 * time.Millisecond):
 			logs, err := os.ReadFile(fileName)
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
 			r.NoError(err)
-			lines := bytes.Split(logs, []byte{'\n'})
+			lines := strings.Split(string(logs), "\n")
 			if len(lines) == 3 {
+				r.NotEmpty(lines[0])
+				r.NotEmpty(lines[1])
+				r.Equal("", lines[2])
 				return
 			}
 		case <-timeout:
@@ -87,7 +90,7 @@ func TestPodNetworkMetricMarshal(t *testing.T) {
 	r.NoError(err)
 
 	jsBytesFast := marshalJSON(&metric)
-	r.Equal("\n"+string(jsBytes), string(jsBytesFast))
+	r.Equal(string(jsBytes)+"\n", string(jsBytesFast))
 }
 
 func BenchmarkMarshalJSONFast(b *testing.B) {
