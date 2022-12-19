@@ -44,11 +44,10 @@ type Config struct {
 }
 
 type Collector struct {
-	cfg         Config
-	log         logrus.FieldLogger
-	kubeWatcher kube.Watcher
-	conntracker conntrack.Client
-	//processedEntriesCache *lru.Cache[uint64, *conntrack.Entry]
+	cfg                   Config
+	log                   logrus.FieldLogger
+	kubeWatcher           kube.Watcher
+	conntracker           conntrack.Client
 	processedEntriesCache map[uint64]*conntrack.Entry
 	excludeNsMap          map[string]struct{}
 	metricsChan           chan PodNetworkMetric
@@ -138,7 +137,7 @@ func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 		hash := entryKey(&e)
 		newCache[hash] = &e
 	}
-
+	a.log.Infof("updating conntrack records, old length: %d, new length: %d", len(a.processedEntriesCache), len(newCache))
 	a.processedEntriesCache = newCache
 }
 
