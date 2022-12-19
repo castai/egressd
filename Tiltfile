@@ -50,5 +50,7 @@ k8s_yaml(helm(
     chart_path,
     name='egressd',
     namespace=namespace,
-    set=[]
+    set=[
+      'image.repository=localhost:5000/egressd'
+    ]
 ))

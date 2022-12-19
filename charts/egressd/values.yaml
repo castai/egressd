@@ -2,7 +2,7 @@
 # Declare variables to be passed into your templates.
 
 image:
-  repository: localhost:5000/egressd
+  repository: ghcr.io/castai/egressd/egressd
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -20,9 +20,7 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-podAnnotations:
-  prometheus.io/port: "6060"
-  prometheus.io/scrape: "true"
+podAnnotations: {}
 
 podSecurityContext: {}
   # fsGroup: 2000
