@@ -129,13 +129,11 @@ func (a *Collector) run() error {
 	return nil
 }
 
-// TODO: replace with swapable map
 func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 	newCache := make(map[uint64]*conntrack.Entry)
 	for _, e := range entries {
 		e := e
-		hash := entryKey(&e)
-		newCache[hash] = &e
+		newCache[entryKey(&e)] = &e
 	}
 	a.log.Infof("updating conntrack records, old length: %d, new length: %d", len(a.processedEntriesCache), len(newCache))
 	a.processedEntriesCache = newCache

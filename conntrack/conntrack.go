@@ -23,10 +23,10 @@ func (e *Entry) CreateDiffEntry(newEntry *Entry) Entry {
 		Dst:       e.Dst,
 		Proto:     e.Proto,
 		Ingress:   e.Ingress,
-		RxBytes:   e.RxBytes,
+		RxBytes:   newEntry.RxBytes - e.RxBytes,
 		TxBytes:   newEntry.TxBytes - e.TxBytes,
-		TxPackets: e.TxPackets,
-		RxPackets: e.RxPackets,
+		TxPackets: newEntry.TxPackets - e.TxPackets,
+		RxPackets: newEntry.RxPackets - e.RxPackets,
 	}
 }
 
