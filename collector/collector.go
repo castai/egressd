@@ -147,7 +147,8 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 		entry, found := a.processedEntriesCache[hash]
 		if found {
 			// don't calculate if it's a colliding new connection
-			if conn.TxBytes-entry.TxBytes >= 0 {
+			// this might overflow on 8192 PB tx
+			if int64(conn.TxBytes)-int64(entry.TxBytes) >= 0 {
 				conn.TxBytes = conn.TxBytes - entry.TxBytes
 				conn.RxBytes = conn.RxBytes - entry.RxBytes
 				conn.TxPackets = conn.TxPackets - entry.TxPackets
