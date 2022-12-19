@@ -146,7 +146,10 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 		hash := entryKey(&conn)
 		entry, found := a.processedEntriesCache[hash]
 		if found {
-			conn = entry.CreateDiffEntry(&conn)
+			conn.TxBytes = conn.TxBytes - entry.TxBytes
+			conn.RxBytes = conn.RxBytes - entry.RxBytes
+			conn.TxPackets = conn.TxPackets - entry.TxPackets
+			conn.RxPackets = conn.RxPackets - entry.RxPackets
 		}
 		reportedConns = append(reportedConns, conn)
 	}

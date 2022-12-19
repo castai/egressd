@@ -17,19 +17,6 @@ type Entry struct {
 	Ingress   bool
 }
 
-func (e *Entry) CreateDiffEntry(newEntry *Entry) Entry {
-	return Entry{
-		Src:       e.Src,
-		Dst:       e.Dst,
-		Proto:     e.Proto,
-		Ingress:   e.Ingress,
-		RxBytes:   newEntry.RxBytes - e.RxBytes,
-		TxBytes:   newEntry.TxBytes - e.TxBytes,
-		TxPackets: newEntry.TxPackets - e.TxPackets,
-		RxPackets: newEntry.RxPackets - e.RxPackets,
-	}
-}
-
 type EntriesFilter func(e *Entry) bool
 
 func All() EntriesFilter {
