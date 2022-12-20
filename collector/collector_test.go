@@ -84,10 +84,9 @@ func TestCollector(t *testing.T) {
 	close(coll.metricsChan)
 	<-done
 
-	// First entry is summed, second did not change from saved value
-	r.Len(metrics, 2)
+	// First entry is summed, second is not added as it didn't change
+	r.Len(metrics, 1)
 	r.Equal(20, int(metrics[0].TxBytes))
-	r.Equal(0, int(metrics[1].TxBytes))
 	// TODO: More asserts and more entries.
 }
 
