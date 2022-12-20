@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/castai/egressd/metrics"
 	ct "github.com/florianl/go-conntrack"
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
+
+	"github.com/castai/egressd/metrics"
 )
 
 func NewNetfilterClient(log logrus.FieldLogger) (Client, error) {
@@ -58,9 +59,6 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]En
 			Proto:     *origin.Proto.Number,
 			Ingress:   false,
 		}
-		if filter(&egress) {
-			res[egress.Src.IP()] = append(res[egress.Src.IP()], egress)
-		}
 		ingress := Entry{
 			Src:       netaddr.IPPortFrom(ipFromStdIP(*reply.Src), *reply.Proto.SrcPort),
 			Dst:       netaddr.IPPortFrom(ipFromStdIP(*reply.Dst), *reply.Proto.DstPort),
@@ -89,6 +87,10 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]En
 			}
 			if filter(&egress2) {
 				res[egress2.Src.IP()] = append(res[egress2.Src.IP()], egress2)
+			}
+		} else {
+			if filter(&egress) {
+				res[egress.Src.IP()] = append(res[egress.Src.IP()], egress)
 			}
 		}
 
