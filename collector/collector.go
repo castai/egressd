@@ -140,7 +140,7 @@ func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 }
 
 func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []conntrack.Entry, ts int64) ([]PodNetworkMetric, error) {
-	reportedConns := make([]conntrack.Entry, 0)
+	changedConns := make([]conntrack.Entry, 0)
 	for _, conn := range podConns {
 		conn := conn
 		hash := entryKey(&conn)
@@ -148,17 +148,24 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 		if found {
 			// don't calculate if it's a colliding new connection
 			// this might overflow on 8192 PB tx
-			if int64(conn.TxBytes)-int64(entry.TxBytes) >= 0 {
-				conn.TxBytes = conn.TxBytes - entry.TxBytes
-				conn.RxBytes = conn.RxBytes - entry.RxBytes
+			txDelta := int64(conn.TxBytes) - int64(entry.TxBytes)
+			rxDelta := int64(conn.RxBytes) - int64(entry.RxBytes)
+
+			// are there new bytes we have to report
+			if txDelta > 0 || rxDelta > 0 {
+				conn.TxBytes = uint64(txDelta)
+				conn.RxBytes = uint64(rxDelta)
 				conn.TxPackets = conn.TxPackets - entry.TxPackets
 				conn.RxPackets = conn.RxPackets - entry.RxPackets
+
+				changedConns = append(changedConns, conn)
 			}
+		} else {
+			changedConns = append(changedConns, conn)
 		}
-		reportedConns = append(reportedConns, conn)
 	}
 
-	grouped := groupConns(reportedConns)
+	grouped := groupConns(changedConns)
 	res := make([]PodNetworkMetric, 0, len(grouped))
 	for _, conn := range grouped {
 		metric := PodNetworkMetric{
