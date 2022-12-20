@@ -146,23 +146,16 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 		hash := entryKey(&conn)
 		entry, found := a.processedEntriesCache[hash]
 		if found {
-			// don't calculate if it's a colliding new connection
-			// this might overflow on 8192 PB tx
-			txDelta := int64(conn.TxBytes) - int64(entry.TxBytes)
-			rxDelta := int64(conn.RxBytes) - int64(entry.RxBytes)
-
-			// are there new bytes we have to report
-			if txDelta > 0 || rxDelta > 0 {
-				conn.TxBytes = uint64(txDelta)
-				conn.RxBytes = uint64(rxDelta)
+			if conn.TxBytes != entry.TxBytes || conn.RxBytes != entry.RxBytes {
+				conn.TxBytes = conn.TxBytes - entry.TxBytes
+				conn.RxBytes = conn.RxBytes - entry.RxBytes
 				conn.TxPackets = conn.TxPackets - entry.TxPackets
 				conn.RxPackets = conn.RxPackets - entry.RxPackets
-
 				changedConns = append(changedConns, conn)
 			}
-		} else {
-			changedConns = append(changedConns, conn)
+			continue
 		}
+		changedConns = append(changedConns, conn)
 	}
 
 	grouped := groupConns(changedConns)
