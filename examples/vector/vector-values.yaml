@@ -27,6 +27,22 @@ customConfig:
         del(.rx_bytes)
         del(.rx_packets)
         del(.ts)
+    network_counter:
+      type: log_to_metric
+      inputs:
+        - vector
+      metrics:
+        - type: counter
+          field: tx_bytes
+          name: egressd_transmit_bytes
+          increment_by_value: true
+          tags:
+            src_pod: '{{ "{{ src_pod }}" }}'
+            dst_pod: '{{ "{{ dst_pod }}" }}'
+            src_namespace: '{{ "{{ src_namespace }}" }}'
+            src_ip: '{{ "{{ src_ip }}" }}'
+            dst_ip: '{{ "{{ dst_ip }}" }}'
+            proto: '{{ "{{ proto }}" }}'
 
   sinks:
     prom_exporter:
@@ -58,3 +74,11 @@ customConfig:
         proto: '{{ "{{ proto }}" }}'
       batch:
         timeout_secs: 3
+    counter_metrics:
+      type: prometheus_remote_write
+      healthcheck: false
+      inputs:
+        - network_counter
+      batch:
+        timeout_secs: 5
+      endpoint: "http://prom-prometheus-server.egressd.svc.cluster.local/api/v1/write"

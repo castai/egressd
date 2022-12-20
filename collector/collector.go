@@ -11,7 +11,6 @@ import (
 	"github.com/castai/egressd/conntrack"
 	"github.com/castai/egressd/kube"
 	"github.com/castai/egressd/metrics"
-	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
@@ -25,10 +24,7 @@ func New(cfg Config, log logrus.FieldLogger, kubeWatcher kube.Watcher, conntrack
 			excludeNsMap[ns] = struct{}{}
 		}
 	}
-	processedEntriesCache, err := lru.New[uint64, struct{}](cfg.CacheItems)
-	if err != nil {
-		panic(err)
-	}
+	processedEntriesCache := make(map[uint64]*conntrack.Entry)
 	return &Collector{
 		cfg:                   cfg,
 		log:                   log,
@@ -52,7 +48,7 @@ type Collector struct {
 	log                   logrus.FieldLogger
 	kubeWatcher           kube.Watcher
 	conntracker           conntrack.Client
-	processedEntriesCache *lru.Cache[uint64, struct{}]
+	processedEntriesCache map[uint64]*conntrack.Entry
 	excludeNsMap          map[string]struct{}
 	metricsChan           chan PodNetworkMetric
 }
@@ -93,6 +89,7 @@ func (a *Collector) run() error {
 	metrics.SetConntrackActiveEntriesCount(float64(len(conns)))
 
 	ts := time.Now().UnixMilli() // Generate timestamp which is added for each metric during this cycle.
+	records := make([]conntrack.Entry, 0)
 	for _, pod := range pods {
 		podIP := pod.Status.PodIP
 		if podIP == "" {
@@ -123,31 +120,45 @@ func (a *Collector) run() error {
 				a.log.Warning("dropping metric event, channel is full")
 			}
 		}
-		a.markProcessedEntries(podConns)
+
+		records = append(records, podConns...)
 	}
+
+	a.markProcessedEntries(records)
 
 	return nil
 }
 
 func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
+	newCache := make(map[uint64]*conntrack.Entry)
 	for _, e := range entries {
 		e := e
-		hash := entryKey(&e)
-		a.processedEntriesCache.Add(hash, struct{}{})
+		newCache[entryKey(&e)] = &e
 	}
+	a.log.Infof("updating conntrack records, old length: %d, new length: %d", len(a.processedEntriesCache), len(newCache))
+	a.processedEntriesCache = newCache
 }
 
 func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []conntrack.Entry, ts int64) ([]PodNetworkMetric, error) {
-	newCons := make([]conntrack.Entry, 0)
+	changedConns := make([]conntrack.Entry, 0)
 	for _, conn := range podConns {
 		conn := conn
 		hash := entryKey(&conn)
-		if _, found := a.processedEntriesCache.Get(hash); !found {
-			newCons = append(newCons, conn)
+		entry, found := a.processedEntriesCache[hash]
+		if found {
+			if conn.TxBytes != entry.TxBytes || conn.RxBytes != entry.RxBytes {
+				conn.TxBytes = conn.TxBytes - entry.TxBytes
+				conn.RxBytes = conn.RxBytes - entry.RxBytes
+				conn.TxPackets = conn.TxPackets - entry.TxPackets
+				conn.RxPackets = conn.RxPackets - entry.RxPackets
+				changedConns = append(changedConns, conn)
+			}
+			continue
 		}
+		changedConns = append(changedConns, conn)
 	}
 
-	grouped := groupConns(newCons)
+	grouped := groupConns(changedConns)
 	res := make([]PodNetworkMetric, 0, len(grouped))
 	for _, conn := range grouped {
 		metric := PodNetworkMetric{
@@ -276,14 +287,6 @@ func entryKey(conn *conntrack.Entry) uint64 {
 	var dstPort [2]byte
 	binary.LittleEndian.PutUint16(dstPort[:], conn.Dst.Port())
 	_, _ = entryHash.Write(dstPort[:])
-
-	var txBytes [8]byte
-	binary.LittleEndian.PutUint64(txBytes[:], conn.TxBytes)
-	_, _ = entryHash.Write(txBytes[:])
-
-	var rxBytes [8]byte
-	binary.LittleEndian.PutUint64(rxBytes[:], conn.RxBytes)
-	_, _ = entryHash.Write(rxBytes[:])
 
 	_ = entryHash.WriteByte(conn.Proto)
 	res := entryHash.Sum64()

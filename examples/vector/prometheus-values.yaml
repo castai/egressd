@@ -1,0 +1,12 @@
+###############################
+#                             #
+#   Prometheus stack config   #
+#                             #
+###############################
+server:
+  extraFlags:
+    - web.enable-lifecycle
+    - web.enable-remote-write-receiver
+  global:
+    scrape_interval: 5s
+    scrape_timeout: 4s

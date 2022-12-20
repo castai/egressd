@@ -72,6 +72,20 @@ export:
           - logs
         source: |-
           . = parse_json!(string!(.message))
+      network_counter:
+        type: log_to_metric
+        inputs:
+          - events
+        metrics:
+          - type: counter
+            field: tx_bytes
+            name: egressd_transmit_bytes
+            increment_by_value: true
+            tags:
+              src_pod: "{{ src_pod }}"
+              dst_pod: "{{ dst_pod }}"
+              src_ip: "{{ src_ip }}"
+              dst_ip: "{{ dst_ip }}"
 
     sinks:
       vector_aggregator:
@@ -79,3 +93,8 @@ export:
         inputs:
           - events
         address: vector-egressd-headless.egressd.svc.cluster.local:6000
+      counter_metrics:
+        type: prometheus_remote_write
+        inputs:
+          - network_counter
+        endpoint: http://prom-prometheus-server.egressd.svc.cluster.local/api/v1/write
