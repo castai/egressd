@@ -49,16 +49,6 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]En
 		originCounter := sess.CounterOrigin
 		reply := sess.Reply
 		replyCounter := sess.CounterReply
-		egress := Entry{
-			Src:       netaddr.IPPortFrom(ipFromStdIP(*origin.Src), *origin.Proto.SrcPort),
-			Dst:       netaddr.IPPortFrom(ipFromStdIP(*origin.Dst), *origin.Proto.DstPort),
-			TxBytes:   *originCounter.Bytes,
-			TxPackets: *originCounter.Packets,
-			RxBytes:   *replyCounter.Bytes,
-			RxPackets: *replyCounter.Packets,
-			Proto:     *origin.Proto.Number,
-			Ingress:   false,
-		}
 		ingress := Entry{
 			Src:       netaddr.IPPortFrom(ipFromStdIP(*reply.Src), *reply.Proto.SrcPort),
 			Dst:       netaddr.IPPortFrom(ipFromStdIP(*reply.Dst), *reply.Proto.DstPort),
@@ -71,6 +61,17 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) (map[netaddr.IP][]En
 		}
 		if filter(&ingress) {
 			res[ingress.Src.IP()] = append(res[ingress.Src.IP()], ingress)
+		}
+
+		egress := Entry{
+			Src:       netaddr.IPPortFrom(ipFromStdIP(*origin.Src), *origin.Proto.SrcPort),
+			Dst:       netaddr.IPPortFrom(ipFromStdIP(*origin.Dst), *origin.Proto.DstPort),
+			TxBytes:   *originCounter.Bytes,
+			TxPackets: *originCounter.Packets,
+			RxBytes:   *replyCounter.Bytes,
+			RxPackets: *replyCounter.Packets,
+			Proto:     *origin.Proto.Number,
+			Ingress:   false,
 		}
 
 		// ClusterIP nat. Add as egress, but use destination as ingress source.

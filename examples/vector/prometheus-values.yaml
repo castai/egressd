@@ -1,12 +1,25 @@
-###############################
-#                             #
-#   Prometheus stack config   #
-#                             #
-###############################
+alertmanager:
+  enabled: false
+
+prometheus-pushgateway:
+  enabled: false
+
+prometheus-node-exporter:
+  enabled: false
+
+kube-state-metrics:
+  enabled: false
+
 server:
   extraFlags:
     - web.enable-lifecycle
     - web.enable-remote-write-receiver
-  global:
-    scrape_interval: 5s
-    scrape_timeout: 4s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+
+# Disable scape config as we only write our vector metrics.
+serverFiles:
+  prometheus.yml:
+    scrape_configs:

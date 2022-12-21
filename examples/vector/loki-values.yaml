@@ -30,7 +30,7 @@ monitoring:
     enabled: false
   selfMonitoring:
     enabled: false
-    lokiCanary:
-      enabled: false
     grafanaAgent:
       installOperator: false
+  lokiCanary:
+    enabled: false

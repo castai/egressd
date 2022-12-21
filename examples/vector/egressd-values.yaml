@@ -2,9 +2,6 @@ podAnnotations:
   prometheus.io/scrape: "true"
   prometheus.io/port: "6060"
 image:
-  tag: "ec519aee7854435036cee0c9a31dd1ec5bafd987"
+  tag: "1cdc844e47411153572534e720d81a547b0a58e3"
 egressd:
   conntrack: "nf"
-tolerations:
-  - key: scheduling.cast.ai/spot
-    operator: Exists

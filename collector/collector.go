@@ -82,7 +82,15 @@ func (a *Collector) run() error {
 		return err
 	}
 
-	conns, err := a.conntracker.ListEntries(conntrack.EgressOnly())
+	podIPs := make(map[netaddr.IP]struct{}, 0)
+	for _, pod := range pods {
+		if pod.Status.PodIP == "" {
+			continue
+		}
+		podIPs[netaddr.MustParseIP(pod.Status.PodIP)] = struct{}{}
+	}
+
+	conns, err := a.conntracker.ListEntries(conntrack.EgressOnly(podIPs))
 	if err != nil {
 		return err
 	}

@@ -25,9 +25,13 @@ func All() EntriesFilter {
 	}
 }
 
-func EgressOnly() EntriesFilter {
+func EgressOnly(podIPs map[netaddr.IP]struct{}) EntriesFilter {
 	return func(e *Entry) bool {
-		return !e.Ingress
+		if !e.Ingress {
+			return false
+		}
+		_, found := podIPs[e.Src.IP()]
+		return found
 	}
 }
 
