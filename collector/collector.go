@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func New(
@@ -96,7 +97,8 @@ func (a *Collector) run() error {
 		return err
 	}
 
-	podIPs := make(map[netaddr.IP]struct{}, 0)
+	// Filter pods for tracking.
+	ips := make(map[netaddr.IP]struct{}, 0)
 	var filteredPods []*corev1.Pod
 	for _, pod := range pods {
 		podIP := pod.Status.PodIP
@@ -110,11 +112,34 @@ func (a *Collector) run() error {
 		if _, found := a.excludeNsMap[pod.Namespace]; found {
 			continue
 		}
-		podIPs[netaddr.MustParseIP(pod.Status.PodIP)] = struct{}{}
+		ips[netaddr.MustParseIP(pod.Status.PodIP)] = struct{}{}
 		filteredPods = append(filteredPods, pod)
 	}
 
-	conns, err := a.conntracker.ListEntries(conntrack.FilterByIPs(podIPs))
+	// Add special host network pod to handle host network traffic.
+	srcNode, err := a.kubeWatcher.GetNodeByName(a.cfg.NodeName)
+	if err != nil && !errors.Is(err, kube.ErrNotFound) {
+		return err
+	}
+	if srcNode != nil {
+		nodeIP := getNodePrivateIP(srcNode)
+		hostNetworkPod := &corev1.Pod{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      "host-network",
+				Namespace: "host-network",
+			},
+			Spec: corev1.PodSpec{
+				NodeName: a.cfg.NodeName,
+			},
+			Status: corev1.PodStatus{
+				PodIP: nodeIP.String(),
+			},
+		}
+		filteredPods = append(filteredPods, hostNetworkPod)
+		ips[nodeIP] = struct{}{}
+	}
+
+	conns, err := a.conntracker.ListEntries(conntrack.FilterByIPs(ips))
 	if err != nil {
 		return err
 	}
@@ -140,7 +165,6 @@ func (a *Collector) run() error {
 				a.log.Warning("dropping metric event, channel is full")
 			}
 		}
-
 		records = append(records, podConns...)
 	}
 
@@ -153,6 +177,7 @@ func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 	newCache := make(map[uint64]*conntrack.Entry)
 	for _, e := range entries {
 		e := e
+		// TODO: Cache key is now calculated 2 times. Precalculate once during conntrack records fetch.
 		newCache[entryKey(&e)] = &e
 	}
 	a.log.Infof("updating conntrack records, old length: %d, new length: %d", len(a.processedEntriesCache), len(newCache))
@@ -345,4 +370,13 @@ func ipType(ip netaddr.IP) string {
 		return "private"
 	}
 	return "public"
+}
+
+func getNodePrivateIP(n *corev1.Node) netaddr.IP {
+	for _, addr := range n.Status.Addresses {
+		if addr.Type == corev1.NodeInternalIP {
+			return netaddr.MustParseIP(addr.Address)
+		}
+	}
+	return netaddr.IP{}
 }

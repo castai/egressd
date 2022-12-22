@@ -46,6 +46,15 @@ func TestCollector(t *testing.T) {
 			RxPackets: 3,
 			Proto:     6,
 		},
+		{
+			Src:       netaddr.MustParseIPPort("10.10.0.16:40002"),
+			Dst:       netaddr.MustParseIPPort("10.10.0.17:80"),
+			TxBytes:   101,
+			TxPackets: 2,
+			RxBytes:   201,
+			RxPackets: 3,
+			Proto:     6,
+		},
 	}
 
 	connTracker := &mockConntrack{
@@ -98,6 +107,14 @@ func TestCollector(t *testing.T) {
 						"topology.kubernetes.io/zone": "us-east1-a",
 					},
 				},
+				Status: corev1.NodeStatus{
+					Addresses: []corev1.NodeAddress{
+						{
+							Type:    corev1.NodeInternalIP,
+							Address: "10.10.0.16",
+						},
+					},
+				},
 			},
 			{
 				ObjectMeta: v1.ObjectMeta{
@@ -138,7 +155,7 @@ func TestCollector(t *testing.T) {
 	<-done
 
 	// First entry is summed, second is not added as it didn't change
-	r.Len(metrics, 2)
+	r.Len(metrics, 3)
 	m1 := metrics[0]
 	r.Equal(PodNetworkMetric{
 		SrcIP:        "10.14.7.12",
@@ -180,6 +197,27 @@ func TestCollector(t *testing.T) {
 		Proto:        "TCP",
 		TS:           1577840461000,
 	}, m2)
+
+	m3 := metrics[2]
+	r.Equal(PodNetworkMetric{
+		SrcIP:        "10.10.0.16",
+		SrcPod:       "host-network",
+		SrcNamespace: "host-network",
+		SrcNode:      "n1",
+		SrcZone:      "us-east1-a",
+		DstIP:        "10.10.0.17",
+		DstIPType:    "private",
+		DstPod:       "",
+		DstNamespace: "",
+		DstNode:      "",
+		DstZone:      "",
+		TxBytes:      101,
+		TxPackets:    2,
+		RxBytes:      201,
+		RxPackets:    3,
+		Proto:        "TCP",
+		TS:           1577840461000,
+	}, m3)
 }
 
 func TestGroupPodConns(t *testing.T) {
