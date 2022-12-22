@@ -1,4 +1,4 @@
-fullnameOverride: vector-egressd
+fullnameOverride: vector
 role: Aggregator
 
 terminationGracePeriodSeconds: 3
@@ -18,19 +18,17 @@ customConfig:
       version: "2"
 
   transforms:
-    tx_bytes_logs:
+    logs:
       type: remap
       inputs:
         - vector
       source: |-
-        del(.tx_packets)
-        del(.rx_bytes)
-        del(.rx_packets)
-        del(.ts)
-    network_counter:
+        . = parse_json!(string!(.message))
+
+    network_tx_bytes_counter:
       type: log_to_metric
       inputs:
-        - vector
+        - logs
       metrics:
         - type: counter
           field: tx_bytes
@@ -40,6 +38,24 @@ customConfig:
             src_pod: '{{ "{{ src_pod }}" }}'
             dst_pod: '{{ "{{ dst_pod }}" }}'
             src_namespace: '{{ "{{ src_namespace }}" }}'
+            dst_namespace: '{{ "{{ dst_namespace }}" }}'
+            src_ip: '{{ "{{ src_ip }}" }}'
+            dst_ip: '{{ "{{ dst_ip }}" }}'
+            proto: '{{ "{{ proto }}" }}'
+    network_tx_packets_counter:
+      type: log_to_metric
+      inputs:
+        - logs
+      metrics:
+        - type: counter
+          field: tx_packets
+          name: egressd_transmit_packets
+          increment_by_value: true
+          tags:
+            src_pod: '{{ "{{ src_pod }}" }}'
+            dst_pod: '{{ "{{ dst_pod }}" }}'
+            src_namespace: '{{ "{{ src_namespace }}" }}'
+            dst_namespace: '{{ "{{ dst_namespace }}" }}'
             src_ip: '{{ "{{ src_ip }}" }}'
             dst_ip: '{{ "{{ dst_ip }}" }}'
             proto: '{{ "{{ proto }}" }}'
@@ -55,30 +71,28 @@ customConfig:
 #        - vector
 #      encoding:
 #        codec: json
-    loki_tx_bytes_logs:
+    loki_logs:
       type: loki
       inputs:
-        - tx_bytes_logs
+        - logs
       endpoint: "http://loki-headless.egressd.svc.cluster.local:3100"
       compression: "snappy"
       encoding:
         codec: json
       labels:
-        forwarder: vector_tx_bytes
+        forwarder: vector
         src_pod: '{{ "{{ src_pod }}" }}'
         src_namespace: '{{ "{{ src_namespace }}" }}'
         src_node: '{{ "{{ src_node }}" }}'
-        dst_pod: '{{ "{{ dst_pod }}" }}'
-        dst_namespace: '{{ "{{ dst_namespace }}" }}'
-        dst_node: '{{ "{{ dst_node }}" }}'
         proto: '{{ "{{ proto }}" }}'
       batch:
-        timeout_secs: 3
+        timeout_secs: 5
     counter_metrics:
       type: prometheus_remote_write
       healthcheck: false
       inputs:
-        - network_counter
+        - network_tx_bytes_counter
+        - network_tx_packets_counter
       batch:
         timeout_secs: 5
       endpoint: "http://prom-prometheus-server.egressd.svc.cluster.local/api/v1/write"

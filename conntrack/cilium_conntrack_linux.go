@@ -12,8 +12,8 @@ import (
 	"inet.af/netaddr"
 )
 
-func listRecords(maps []interface{}, filter EntriesFilter) (map[netaddr.IP][]Entry, error) {
-	entries := make(map[netaddr.IP][]Entry)
+func listRecords(maps []interface{}, filter EntriesFilter) ([]Entry, error) {
+	entries := make([]Entry, 0)
 
 	var fetchedCount int
 	for _, m := range maps {
@@ -46,10 +46,9 @@ func listRecords(maps []interface{}, filter EntriesFilter) (map[netaddr.IP][]Ent
 				RxBytes:   val.RxBytes,
 				RxPackets: val.RxPackets,
 				Proto:     uint8(k.NextHeader),
-				Ingress:   k.Flags&ctmap.TUPLE_F_IN != 0,
 			}
 			if filter(&record) {
-				entries[record.Src.IP()] = append(entries[record.Src.IP()], record)
+				entries = append(entries, record)
 			}
 		}
 		if err = m.DumpWithCallback(cb); err != nil {

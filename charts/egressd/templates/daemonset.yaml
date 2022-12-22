@@ -10,8 +10,9 @@ spec:
       {{- include "egressd.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
@@ -49,10 +50,17 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          args:
+          command:
             - "/usr/local/bin/egressd"
-            - "-conntrack-mode"
-            - "{{.Values.egressd.conntrack}}"
+          args:
+            - "-conntrack-mode={{.Values.egressd.conntrack}}"
+        {{- range $key, $value := .Values.extraArgs }}
+        {{- if $value }}
+            - "-{{ $key }}={{ $value }}"
+        {{- else }}
+            - "-{{ $key }}"
+        {{- end }}
+        {{- end }}
           env:
             - name: NODE_NAME
               valueFrom:
