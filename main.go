@@ -102,7 +102,7 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 		ExcludeNamespaces: *excludeNamespaces,
 		CacheItems:        20000,
 	}
-	coll := collector.New(cfg, log, kubeWatcher, conntracker)
+	coll := collector.New(cfg, log, kubeWatcher, conntracker, collector.CurrentTimeGetter())
 
 	if *exportFileName != "" {
 		export := exporter.New(exporter.Config{

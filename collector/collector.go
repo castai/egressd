@@ -16,7 +16,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func New(cfg Config, log logrus.FieldLogger, kubeWatcher kube.Watcher, conntracker conntrack.Client) *Collector {
+func New(
+	cfg Config,
+	log logrus.FieldLogger,
+	kubeWatcher kube.Watcher,
+	conntracker conntrack.Client,
+	currentTimeGetter func() time.Time,
+) *Collector {
 	excludeNsMap := map[string]struct{}{}
 	if cfg.ExcludeNamespaces != "" {
 		nsList := strings.Split(cfg.ExcludeNamespaces, ",")
@@ -33,6 +39,13 @@ func New(cfg Config, log logrus.FieldLogger, kubeWatcher kube.Watcher, conntrack
 		processedEntriesCache: processedEntriesCache,
 		metricsChan:           make(chan PodNetworkMetric, 10000),
 		excludeNsMap:          excludeNsMap,
+		currentTimeGetter:     currentTimeGetter,
+	}
+}
+
+func CurrentTimeGetter() func() time.Time {
+	return func() time.Time {
+		return time.Now()
 	}
 }
 
@@ -51,6 +64,7 @@ type Collector struct {
 	processedEntriesCache map[uint64]*conntrack.Entry
 	excludeNsMap          map[string]struct{}
 	metricsChan           chan PodNetworkMetric
+	currentTimeGetter     func() time.Time
 }
 
 func (a *Collector) GetMetricsChan() <-chan PodNetworkMetric {
@@ -100,17 +114,17 @@ func (a *Collector) run() error {
 		filteredPods = append(filteredPods, pod)
 	}
 
-	conns, err := a.conntracker.ListEntries(conntrack.EgressOnly(podIPs))
+	conns, err := a.conntracker.ListEntries(conntrack.FilterByIPs(podIPs))
 	if err != nil {
 		return err
 	}
 	metrics.SetConntrackActiveEntriesCount(float64(len(conns)))
 
-	ts := time.Now().UnixMilli() // Generate timestamp which is added for each metric during this cycle.
+	ts := a.currentTimeGetter().UTC().UnixMilli() // Generate timestamp which is added for each metric during this cycle.
 	records := make([]conntrack.Entry, 0)
 	for _, pod := range filteredPods {
-		podConns, found := conns[netaddr.MustParseIP(pod.Status.PodIP)]
-		if !found {
+		podConns := filterConnEntriesByIP(conns, netaddr.MustParseIP(pod.Status.PodIP))
+		if len(podConns) == 0 {
 			continue
 		}
 		podMetrics, err := a.aggregatePodNetworkMetrics(pod, podConns, ts)
@@ -150,13 +164,13 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 	for _, conn := range podConns {
 		conn := conn
 		hash := entryKey(&conn)
-		entry, found := a.processedEntriesCache[hash]
+		prev, found := a.processedEntriesCache[hash]
 		if found {
-			if conn.TxBytes != entry.TxBytes || conn.RxBytes != entry.RxBytes {
-				conn.TxBytes = conn.TxBytes - entry.TxBytes
-				conn.RxBytes = conn.RxBytes - entry.RxBytes
-				conn.TxPackets = conn.TxPackets - entry.TxPackets
-				conn.RxPackets = conn.RxPackets - entry.RxPackets
+			if conn.TxBytes != prev.TxBytes || conn.RxBytes != prev.RxBytes {
+				conn.TxBytes = conn.TxBytes - prev.TxBytes
+				conn.RxBytes = conn.RxBytes - prev.RxBytes
+				conn.TxPackets = conn.TxPackets - prev.TxPackets
+				conn.RxPackets = conn.RxPackets - prev.RxPackets
 				changedConns = append(changedConns, conn)
 			}
 			continue
@@ -232,6 +246,27 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 		res = append(res, metric)
 	}
 	return res, nil
+}
+
+func filterConnEntriesByIP(entries []conntrack.Entry, ip netaddr.IP) []conntrack.Entry {
+	var res []conntrack.Entry
+	for _, e := range entries {
+		if e.Src.IP() == ip {
+			res = append(res, e)
+		} else if e.Dst.IP() == ip {
+			// Swap entry since we always want source pointing to pod ip.
+			res = append(res, conntrack.Entry{
+				Src:       e.Dst,
+				Dst:       e.Src,
+				TxBytes:   e.RxBytes,
+				TxPackets: e.RxPackets,
+				RxBytes:   e.TxBytes,
+				RxPackets: e.RxPackets,
+				Proto:     e.Proto,
+			})
+		}
+	}
+	return res
 }
 
 type groupedConn struct {

@@ -4,11 +4,9 @@ package conntrack
 
 import (
 	"errors"
-
-	"inet.af/netaddr"
 )
 
-func listRecords(maps []interface{}, filter EntriesFilter) (map[netaddr.IP][]Entry, error) {
+func listRecords(maps []interface{}, filter EntriesFilter) ([]Entry, error) {
 	return nil, errors.New("not implemented")
 }
 
