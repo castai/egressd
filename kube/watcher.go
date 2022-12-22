@@ -183,7 +183,9 @@ func transformFunc(obj interface{}) (interface{}, error) {
 	case *corev1.Node:
 		t.SetManagedFields(nil)
 		t.Spec = corev1.NodeSpec{}
-		t.Status = corev1.NodeStatus{}
+		t.Status = corev1.NodeStatus{
+			Addresses: t.Status.Addresses,
+		}
 		return t, nil
 	}
 	return nil, fmt.Errorf("unknown type %T", obj)

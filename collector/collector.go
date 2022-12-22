@@ -123,20 +123,23 @@ func (a *Collector) run() error {
 	}
 	if srcNode != nil {
 		nodeIP := getNodePrivateIP(srcNode)
-		hostNetworkPod := &corev1.Pod{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "host-network",
-				Namespace: "host-network",
-			},
-			Spec: corev1.PodSpec{
-				NodeName: a.cfg.NodeName,
-			},
-			Status: corev1.PodStatus{
-				PodIP: nodeIP.String(),
-			},
+		podIP := nodeIP.String()
+		if podIP != "" {
+			hostNetworkPod := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "host-network",
+					Namespace: "host-network",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: a.cfg.NodeName,
+				},
+				Status: corev1.PodStatus{
+					PodIP: podIP,
+				},
+			}
+			filteredPods = append(filteredPods, hostNetworkPod)
+			ips[nodeIP] = struct{}{}
 		}
-		filteredPods = append(filteredPods, hostNetworkPod)
-		ips[nodeIP] = struct{}{}
 	}
 
 	conns, err := a.conntracker.ListEntries(conntrack.FilterByIPs(ips))
