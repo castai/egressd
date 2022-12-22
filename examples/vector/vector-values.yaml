@@ -37,6 +37,10 @@ customConfig:
           tags:
             src_pod: '{{ "{{ src_pod }}" }}'
             dst_pod: '{{ "{{ dst_pod }}" }}'
+            src_node: '{{ "{{ src_node }}" }}'
+            dst_node: '{{ "{{ dst_node }}" }}'
+            src_zone: '{{ "{{ src_zone }}" }}'
+            dst_zone: '{{ "{{ dst_zone }}" }}'
             src_namespace: '{{ "{{ src_namespace }}" }}'
             dst_namespace: '{{ "{{ dst_namespace }}" }}'
             src_ip: '{{ "{{ src_ip }}" }}'
@@ -54,6 +58,10 @@ customConfig:
           tags:
             src_pod: '{{ "{{ src_pod }}" }}'
             dst_pod: '{{ "{{ dst_pod }}" }}'
+            src_node: '{{ "{{ src_node }}" }}'
+            dst_node: '{{ "{{ dst_node }}" }}'
+            src_zone: '{{ "{{ src_zone }}" }}'
+            dst_zone: '{{ "{{ dst_zone }}" }}'
             src_namespace: '{{ "{{ src_namespace }}" }}'
             dst_namespace: '{{ "{{ dst_namespace }}" }}'
             src_ip: '{{ "{{ src_ip }}" }}'
