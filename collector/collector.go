@@ -83,21 +83,7 @@ func (a *Collector) run() error {
 	}
 
 	podIPs := make(map[netaddr.IP]struct{}, 0)
-	for _, pod := range pods {
-		if pod.Status.PodIP == "" {
-			continue
-		}
-		podIPs[netaddr.MustParseIP(pod.Status.PodIP)] = struct{}{}
-	}
-
-	conns, err := a.conntracker.ListEntries(conntrack.EgressOnly(podIPs))
-	if err != nil {
-		return err
-	}
-	metrics.SetConntrackActiveEntriesCount(float64(len(conns)))
-
-	ts := time.Now().UnixMilli() // Generate timestamp which is added for each metric during this cycle.
-	records := make([]conntrack.Entry, 0)
+	var filteredPods []*corev1.Pod
 	for _, pod := range pods {
 		podIP := pod.Status.PodIP
 		if podIP == "" {
@@ -110,8 +96,20 @@ func (a *Collector) run() error {
 		if _, found := a.excludeNsMap[pod.Namespace]; found {
 			continue
 		}
+		podIPs[netaddr.MustParseIP(pod.Status.PodIP)] = struct{}{}
+		filteredPods = append(filteredPods, pod)
+	}
 
-		podConns, found := conns[netaddr.MustParseIP(podIP)]
+	conns, err := a.conntracker.ListEntries(conntrack.EgressOnly(podIPs))
+	if err != nil {
+		return err
+	}
+	metrics.SetConntrackActiveEntriesCount(float64(len(conns)))
+
+	ts := time.Now().UnixMilli() // Generate timestamp which is added for each metric during this cycle.
+	records := make([]conntrack.Entry, 0)
+	for _, pod := range filteredPods {
+		podConns, found := conns[netaddr.MustParseIP(pod.Status.PodIP)]
 		if !found {
 			continue
 		}
