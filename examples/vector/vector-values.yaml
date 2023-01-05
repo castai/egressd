@@ -37,6 +37,10 @@ customConfig:
           tags:
             src_pod: '{{ "{{ src_pod }}" }}'
             dst_pod: '{{ "{{ dst_pod }}" }}'
+            src_node: '{{ "{{ src_node }}" }}'
+            dst_node: '{{ "{{ dst_node }}" }}'
+            src_zone: '{{ "{{ src_zone }}" }}'
+            dst_zone: '{{ "{{ dst_zone }}" }}'
             src_namespace: '{{ "{{ src_namespace }}" }}'
             dst_namespace: '{{ "{{ dst_namespace }}" }}'
             src_ip: '{{ "{{ src_ip }}" }}'
@@ -54,6 +58,10 @@ customConfig:
           tags:
             src_pod: '{{ "{{ src_pod }}" }}'
             dst_pod: '{{ "{{ dst_pod }}" }}'
+            src_node: '{{ "{{ src_node }}" }}'
+            dst_node: '{{ "{{ dst_node }}" }}'
+            src_zone: '{{ "{{ src_zone }}" }}'
+            dst_zone: '{{ "{{ dst_zone }}" }}'
             src_namespace: '{{ "{{ src_namespace }}" }}'
             dst_namespace: '{{ "{{ dst_namespace }}" }}'
             src_ip: '{{ "{{ src_ip }}" }}'
@@ -65,12 +73,14 @@ customConfig:
       type: prometheus_exporter
       inputs: [ internal_metrics ]
       address: 0.0.0.0:9090
+
 #    stdout:
 #      type: console
 #      inputs:
-#        - vector
+#        - logs
 #      encoding:
 #        codec: json
+
     loki_logs:
       type: loki
       inputs:
@@ -87,6 +97,7 @@ customConfig:
         proto: '{{ "{{ proto }}" }}'
       batch:
         timeout_secs: 5
+
     counter_metrics:
       type: prometheus_remote_write
       healthcheck: false
