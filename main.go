@@ -29,6 +29,7 @@ var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
 	conntrackMode     = flag.String("conntrack-mode", "nf", "")
 	interval          = flag.Duration("interval", 5*time.Second, "")
+	flushInterval     = flag.Duration("flush-interval", 30*time.Second, "")
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
@@ -106,7 +107,7 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 
 	if *exportFileName != "" {
 		export := exporter.New(exporter.Config{
-			FlushInterval:       *interval,
+			FlushInterval:       *flushInterval,
 			ExportFilename:      *exportFileName,
 			ExportFileMaxSizeMB: 10,
 			MaxBackups:          3,
