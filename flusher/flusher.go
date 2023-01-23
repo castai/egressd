@@ -3,22 +3,21 @@ package flusher
 import (
 	"hash/maphash"
 
-	"github.com/cilium/lumberjack/v2"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/samber/lo"
 
 	"github.com/castai/egressd/collector"
 )
 
 type ConntrackDump struct {
 	metrics map[uint64]*collector.PodNetworkMetric
-	writer  *lumberjack.Logger
 	encoder *jsoniter.Encoder
 }
 
-func NewConntrackDump(writer *lumberjack.Logger) *ConntrackDump {
+func NewConntrackDump(encoder *jsoniter.Encoder) *ConntrackDump {
 	return &ConntrackDump{
 		metrics: map[uint64]*collector.PodNetworkMetric{},
-		encoder: jsoniter.NewEncoder(writer),
+		encoder: encoder,
 	}
 }
 
@@ -30,14 +29,14 @@ func (c *ConntrackDump) Dump(metricDelta collector.PodNetworkMetric) {
 		c.metrics[id] = &metricDelta
 		return
 	}
-	c.metrics[id].TxBytes = metricDelta.TxBytes
+	c.metrics[id].TxBytes += metricDelta.TxBytes
 	c.metrics[id].RxBytes += metricDelta.RxBytes
 	c.metrics[id].TxPackets += metricDelta.TxPackets
 	c.metrics[id].RxPackets += metricDelta.RxPackets
 }
 
 func (c *ConntrackDump) Flush() (int, error) {
-	err := c.encoder.Encode(c.metrics)
+	err := c.encoder.Encode(lo.Values(c.metrics))
 	if err != nil {
 		return 0, err
 	}

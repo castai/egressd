@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cilium/lumberjack/v2"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 
 	"github.com/castai/egressd/collector"
@@ -31,7 +32,7 @@ func New(cfg Config, log logrus.FieldLogger, metrics metricsChanGetter) *Exporte
 		MaxBackups: cfg.MaxBackups,
 		Compress:   cfg.Compress,
 	}
-	dump := flusher.NewConntrackDump(writer)
+	dump := flusher.NewConntrackDump(jsoniter.NewEncoder(writer))
 
 	return &Exporter{
 		cfg:     cfg,
@@ -56,9 +57,9 @@ func (e *Exporter) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case metric := <-e.metrics.GetMetricsChan():
+			metrics.IncExportedEvents()
 			e.dump.Dump(metric)
 		case <-ticker.C:
-			metrics.IncExportedEvents()
 			cnt, err := e.dump.Flush()
 			if err != nil {
 				e.log.Errorf("flushing metrics: %v", err)
