@@ -50,7 +50,7 @@ func CurrentTimeGetter() func() time.Time {
 }
 
 type Config struct {
-	Interval          time.Duration
+	ReadInterval      time.Duration
 	NodeName          string
 	ExcludeNamespaces string
 	CacheItems        int
@@ -72,7 +72,7 @@ func (a *Collector) GetMetricsChan() <-chan PodNetworkMetric {
 }
 
 func (a *Collector) Start(ctx context.Context) error {
-	ticker := time.NewTicker(a.cfg.Interval)
+	ticker := time.NewTicker(a.cfg.ReadInterval)
 
 	for {
 		select {
