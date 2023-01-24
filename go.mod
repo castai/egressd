@@ -8,7 +8,6 @@ require (
 	github.com/florianl/go-conntrack v0.3.0
 	github.com/json-iterator/go v1.1.12
 	github.com/prometheus/client_golang v1.12.2
-	github.com/samber/lo v1.37.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
 	inet.af/netaddr v0.0.0-20220811202034-502d2d690317
@@ -86,7 +85,6 @@ require (
 	go.mongodb.org/mongo-driver v1.8.3 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
-	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
