@@ -111,9 +111,9 @@ func TestCollector(t *testing.T) {
 	}
 
 	coll := New(Config{
-		Interval:   time.Second,
-		NodeName:   "n1",
-		CacheItems: 1000,
+		ReadInterval: time.Second,
+		NodeName:     "n1",
+		CacheItems:   1000,
 	}, log,
 		kubeWatcher,
 		connTracker,
