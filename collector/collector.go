@@ -31,12 +31,15 @@ func New(
 		}
 	}
 	processedEntriesCache := make(map[uint64]*conntrack.Entry)
+	podNetworkCache := make(map[uint64]*PodNetworkMetric)
+
 	return &Collector{
 		cfg:                   cfg,
 		log:                   log,
 		kubeWatcher:           kubeWatcher,
 		conntracker:           conntracker,
 		processedEntriesCache: processedEntriesCache,
+		podNetworkCache:       podNetworkCache,
 		metricsChan:           make(chan PodNetworkMetric, 10000),
 		excludeNsMap:          excludeNsMap,
 		currentTimeGetter:     currentTimeGetter,
@@ -51,6 +54,7 @@ func CurrentTimeGetter() func() time.Time {
 
 type Config struct {
 	ReadInterval      time.Duration
+	FlushInterval     time.Duration
 	NodeName          string
 	ExcludeNamespaces string
 	CacheItems        int
@@ -62,6 +66,7 @@ type Collector struct {
 	kubeWatcher           kube.Watcher
 	conntracker           conntrack.Client
 	processedEntriesCache map[uint64]*conntrack.Entry
+	podNetworkCache       map[uint64]*PodNetworkMetric
 	excludeNsMap          map[string]struct{}
 	metricsChan           chan PodNetworkMetric
 	currentTimeGetter     func() time.Time
@@ -72,13 +77,14 @@ func (a *Collector) GetMetricsChan() <-chan PodNetworkMetric {
 }
 
 func (a *Collector) Start(ctx context.Context) error {
-	ticker := time.NewTicker(a.cfg.ReadInterval)
+	readTicker := time.NewTicker(a.cfg.ReadInterval)
+	exportTicker := time.NewTicker(a.cfg.FlushInterval)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-ticker.C:
+		case <-readTicker.C:
 			start := time.Now()
 			a.log.Debug("collecting pod network metrics")
 			if err := a.run(); err != nil {
@@ -86,8 +92,26 @@ func (a *Collector) Start(ctx context.Context) error {
 			} else {
 				a.log.Debugf("collection done in %s", time.Since(start))
 			}
+		case <-exportTicker.C:
+			err := a.export()
+			if err != nil {
+				a.log.Errorf("failed to export: %v", err)
+			}
 		}
 	}
+}
+
+func (a *Collector) export() error {
+	for key, metric := range a.podNetworkCache {
+		select {
+		case a.metricsChan <- *metric:
+			delete(a.podNetworkCache, key)
+		default:
+			metrics.IncDroppedEvents()
+			return errors.New("dropping metric event, channel is full")
+		}
+	}
+	return nil
 }
 
 func (a *Collector) run() error {
@@ -131,16 +155,9 @@ func (a *Collector) run() error {
 		if err != nil {
 			return err
 		}
-		a.log.Debugf("pod=%s, conns=%d, metrics=%d", pod.Name, len(podConns), len(podMetrics))
-		for _, metric := range podMetrics {
-			select {
-			case a.metricsChan <- metric:
-			default:
-				metrics.IncDroppedEvents()
-				a.log.Warning("dropping metric event, channel is full")
-			}
-		}
 
+		a.DumpPodNetworkMetrics(podMetrics)
+		a.log.Debugf("pod=%s, conns=%d, metrics=%d", pod.Name, len(podConns), len(podMetrics))
 		records = append(records, podConns...)
 	}
 
@@ -149,11 +166,27 @@ func (a *Collector) run() error {
 	return nil
 }
 
+func (a *Collector) DumpPodNetworkMetrics(metrics []PodNetworkMetric) {
+	for _, metroid := range metrics {
+		id := podNetworkEntryKey(metroid)
+
+		_, ok := a.podNetworkCache[id]
+		if !ok {
+			a.podNetworkCache[id] = &metroid
+			continue
+		}
+		a.podNetworkCache[id].TxBytes += metroid.TxBytes
+		a.podNetworkCache[id].RxBytes += metroid.RxBytes
+		a.podNetworkCache[id].TxPackets += metroid.TxPackets
+		a.podNetworkCache[id].RxPackets += metroid.RxPackets
+	}
+}
+
 func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
 	newCache := make(map[uint64]*conntrack.Entry)
 	for _, e := range entries {
 		e := e
-		newCache[entryKey(&e)] = &e
+		newCache[conntrackEntryKey(&e)] = &e
 	}
 	a.log.Infof("updating conntrack records, old length: %d, new length: %d", len(a.processedEntriesCache), len(newCache))
 	a.processedEntriesCache = newCache
@@ -163,7 +196,7 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 	changedConns := make([]conntrack.Entry, 0)
 	for _, conn := range podConns {
 		conn := conn
-		hash := entryKey(&conn)
+		hash := conntrackEntryKey(&conn)
 		prev, found := a.processedEntriesCache[hash]
 		if found {
 			if conn.TxBytes != prev.TxBytes || conn.RxBytes != prev.RxBytes {
@@ -316,7 +349,7 @@ func connGroupKey(conn *conntrack.Entry) uint64 {
 
 var entryHash maphash.Hash
 
-func entryKey(conn *conntrack.Entry) uint64 {
+func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 	srcIP := conn.Src.IP().As4()
 	_, _ = entryHash.Write(srcIP[:])
 	var srcPort [2]byte
@@ -330,6 +363,20 @@ func entryKey(conn *conntrack.Entry) uint64 {
 	_, _ = entryHash.Write(dstPort[:])
 
 	_ = entryHash.WriteByte(conn.Proto)
+	res := entryHash.Sum64()
+
+	entryHash.Reset()
+	return res
+}
+
+func podNetworkEntryKey(metric PodNetworkMetric) uint64 {
+	srcIP := []byte(metric.SrcIP)
+	_, _ = entryHash.Write(srcIP[:])
+
+	dstIP := []byte(metric.DstIP)
+	_, _ = entryHash.Write(dstIP[:])
+
+	_, _ = entryHash.Write([]byte(metric.Proto))
 	res := entryHash.Sum64()
 
 	entryHash.Reset()

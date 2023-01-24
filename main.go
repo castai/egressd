@@ -99,6 +99,7 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 	}
 	cfg := collector.Config{
 		ReadInterval:      *readInterval,
+		FlushInterval:     *flushInterval,
 		NodeName:          os.Getenv("NODE_NAME"),
 		ExcludeNamespaces: *excludeNamespaces,
 		CacheItems:        20000,
@@ -107,7 +108,6 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 
 	if *exportFileName != "" {
 		export := exporter.New(exporter.Config{
-			FlushInterval:       *flushInterval,
 			ExportFilename:      *exportFileName,
 			ExportFileMaxSizeMB: 10,
 			MaxBackups:          3,
