@@ -134,6 +134,8 @@ func TestCollector(t *testing.T) {
 	r.NoError(err)
 	err = coll.run()
 	r.NoError(err)
+	err = coll.export()
+	r.NoError(err)
 	close(coll.metricsChan)
 	<-done
 
