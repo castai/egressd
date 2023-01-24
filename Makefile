@@ -6,3 +6,6 @@ build-docker: build
 
 push-docker: build-docker
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker push ghcr.io/castai/egressd/egressd:$(IMAGE_TAG)
+
+lint:
+	golangci-lint run

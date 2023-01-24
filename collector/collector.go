@@ -167,18 +167,19 @@ func (a *Collector) run() error {
 }
 
 func (a *Collector) DumpPodNetworkMetrics(metrics []PodNetworkMetric) {
-	for _, metroid := range metrics {
-		id := podNetworkEntryKey(metroid)
+	for _, m := range metrics {
+		metric := m
 
+		id := podNetworkEntryKey(metric)
 		_, ok := a.podNetworkCache[id]
 		if !ok {
-			a.podNetworkCache[id] = &metroid
+			a.podNetworkCache[id] = &metric
 			continue
 		}
-		a.podNetworkCache[id].TxBytes += metroid.TxBytes
-		a.podNetworkCache[id].RxBytes += metroid.RxBytes
-		a.podNetworkCache[id].TxPackets += metroid.TxPackets
-		a.podNetworkCache[id].RxPackets += metroid.RxPackets
+		a.podNetworkCache[id].TxBytes += metric.TxBytes
+		a.podNetworkCache[id].RxBytes += metric.RxBytes
+		a.podNetworkCache[id].TxPackets += metric.TxPackets
+		a.podNetworkCache[id].RxPackets += metric.RxPackets
 	}
 }
 
