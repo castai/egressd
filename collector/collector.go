@@ -107,7 +107,7 @@ func (a *Collector) export() {
 		default:
 			metrics.IncDroppedEvents()
 			a.log.Errorf("dropping metric event, channel is full. "+
-				"Consider increasing --metrics-buffer-size from current value: %d", a.cfg.CacheItems)
+				"Consider increasing --metrics-buffer-size from current value: %d", a.cfg.MetricBufferSize)
 		}
 	}
 }
