@@ -170,7 +170,7 @@ func (a *Collector) DumpPodNetworkMetrics(metrics []PodNetworkMetric) {
 	for _, m := range metrics {
 		metric := m
 
-		id := podNetworkMetricKey(metric)
+		id := podNetworkMetricKey(&metric)
 		entry, ok := a.podNetworkCache[id]
 		if !ok {
 			a.podNetworkCache[id] = &metric
@@ -372,7 +372,7 @@ func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 
 var podNetworkEntryHash maphash.Hash
 
-func podNetworkMetricKey(metric PodNetworkMetric) uint64 {
+func podNetworkMetricKey(metric *PodNetworkMetric) uint64 {
 	srcIP := []byte(metric.SrcIP)
 	_, _ = podNetworkEntryHash.Write(srcIP[:])
 
