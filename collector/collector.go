@@ -94,15 +94,12 @@ func (a *Collector) Start(ctx context.Context) error {
 				a.log.Debugf("collection done in %s", time.Since(start))
 			}
 		case <-exportTicker.C:
-			err := a.export()
-			if err != nil {
-				a.log.Errorf("failed to export: %v", err)
-			}
+			a.export()
 		}
 	}
 }
 
-func (a *Collector) export() error {
+func (a *Collector) export() {
 	for key, metric := range a.podNetworkCache {
 		select {
 		case a.metricsChan <- *metric:
@@ -113,7 +110,6 @@ func (a *Collector) export() error {
 				"Consider increasing --metrics-buffer-size from current value: %d", a.cfg.CacheItems)
 		}
 	}
-	return nil
 }
 
 func (a *Collector) collect() error {

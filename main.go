@@ -104,6 +104,7 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 		NodeName:          os.Getenv("NODE_NAME"),
 		ExcludeNamespaces: *excludeNamespaces,
 		CacheItems:        20000,
+		MetricBufferSize:  *metricBufferSize,
 	}
 	coll := collector.New(cfg, log, kubeWatcher, conntracker, collector.CurrentTimeGetter())
 
