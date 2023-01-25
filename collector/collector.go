@@ -40,7 +40,7 @@ func New(
 		conntracker:           conntracker,
 		processedEntriesCache: processedEntriesCache,
 		podNetworkCache:       podNetworkCache,
-		metricsChan:           make(chan PodNetworkMetric, 10000),
+		metricsChan:           make(chan PodNetworkMetric, cfg.MetricBufferSize),
 		excludeNsMap:          excludeNsMap,
 		currentTimeGetter:     currentTimeGetter,
 	}
@@ -58,6 +58,7 @@ type Config struct {
 	NodeName          string
 	ExcludeNamespaces string
 	CacheItems        int
+	MetricBufferSize  int
 }
 
 type Collector struct {
@@ -108,7 +109,8 @@ func (a *Collector) export() error {
 			delete(a.podNetworkCache, key)
 		default:
 			metrics.IncDroppedEvents()
-			return errors.New("dropping metric event, channel is full")
+			a.log.Errorf("dropping metric event, channel is full. "+
+				"Consider increasing --metrics-buffer-size from current value: %d", a.cfg.CacheItems)
 		}
 	}
 	return nil
@@ -156,7 +158,6 @@ func (a *Collector) collect() error {
 			return err
 		}
 
-		a.DumpPodNetworkMetrics(podMetrics)
 		a.log.Debugf("pod=%s, conns=%d, metrics=%d", pod.Name, len(podConns), len(podMetrics))
 		records = append(records, podConns...)
 	}
@@ -164,23 +165,6 @@ func (a *Collector) collect() error {
 	a.markProcessedEntries(records)
 
 	return nil
-}
-
-func (a *Collector) DumpPodNetworkMetrics(metrics []PodNetworkMetric) {
-	for _, m := range metrics {
-		metric := m
-
-		id := podNetworkMetricKey(&metric)
-		entry, ok := a.podNetworkCache[id]
-		if !ok {
-			a.podNetworkCache[id] = &metric
-			continue
-		}
-		entry.TxBytes += metric.TxBytes
-		entry.RxBytes += metric.RxBytes
-		entry.TxPackets += metric.TxPackets
-		entry.RxPackets += metric.RxPackets
-	}
 }
 
 func (a *Collector) markProcessedEntries(entries []conntrack.Entry) {
@@ -277,8 +261,21 @@ func (a *Collector) aggregatePodNetworkMetrics(pod *corev1.Pod, podConns []connt
 			}
 		}
 
+		// add metric data to pod network cache
+		id := podNetworkMetricKey(&metric)
+		entry, ok := a.podNetworkCache[id]
+		if !ok {
+			a.podNetworkCache[id] = &metric
+			continue
+		}
+		entry.TxBytes += metric.TxBytes
+		entry.RxBytes += metric.RxBytes
+		entry.TxPackets += metric.TxPackets
+		entry.RxPackets += metric.RxPackets
+
 		res = append(res, metric)
 	}
+
 	return res, nil
 }
 

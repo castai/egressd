@@ -33,6 +33,7 @@ var (
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
+	metricBufferSize  = flag.Int("metric-buffer-size", 10000, "Amount of entries that metrics buffer allows storing before blocking")
 )
 
 // These should be set via `go build` during a release.
