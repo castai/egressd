@@ -130,9 +130,9 @@ func TestCollector(t *testing.T) {
 		done <- struct{}{}
 	}()
 
-	err := coll.run()
+	err := coll.collect()
 	r.NoError(err)
-	err = coll.run()
+	err = coll.collect()
 	r.NoError(err)
 	err = coll.export()
 	r.NoError(err)
