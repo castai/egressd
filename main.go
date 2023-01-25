@@ -28,8 +28,8 @@ import (
 var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
 	conntrackMode     = flag.String("conntrack-mode", "nf", "")
-	readInterval      = flag.Duration("read-interval", 5*time.Second, "")
-	flushInterval     = flag.Duration("flush-interval", 5*time.Second, "")
+	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
+	flushInterval     = flag.Duration("flush-interval", 30*time.Second, "Interval of time for flushing pod network cache")
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")

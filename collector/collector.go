@@ -87,7 +87,7 @@ func (a *Collector) Start(ctx context.Context) error {
 		case <-readTicker.C:
 			start := time.Now()
 			a.log.Debug("collecting pod network metrics")
-			if err := a.run(); err != nil {
+			if err := a.collect(); err != nil {
 				a.log.Errorf("collect error: %v", err)
 			} else {
 				a.log.Debugf("collection done in %s", time.Since(start))
@@ -114,7 +114,7 @@ func (a *Collector) export() error {
 	return nil
 }
 
-func (a *Collector) run() error {
+func (a *Collector) collect() error {
 	pods, err := a.kubeWatcher.GetPodsByNode(a.cfg.NodeName)
 	if err != nil {
 		return err
@@ -170,16 +170,16 @@ func (a *Collector) DumpPodNetworkMetrics(metrics []PodNetworkMetric) {
 	for _, m := range metrics {
 		metric := m
 
-		id := podNetworkEntryKey(metric)
-		_, ok := a.podNetworkCache[id]
+		id := podNetworkMetricKey(metric)
+		entry, ok := a.podNetworkCache[id]
 		if !ok {
 			a.podNetworkCache[id] = &metric
 			continue
 		}
-		a.podNetworkCache[id].TxBytes += metric.TxBytes
-		a.podNetworkCache[id].RxBytes += metric.RxBytes
-		a.podNetworkCache[id].TxPackets += metric.TxPackets
-		a.podNetworkCache[id].RxPackets += metric.RxPackets
+		entry.TxBytes += metric.TxBytes
+		entry.RxBytes += metric.RxBytes
+		entry.TxPackets += metric.TxPackets
+		entry.RxPackets += metric.RxPackets
 	}
 }
 
@@ -348,39 +348,41 @@ func connGroupKey(conn *conntrack.Entry) uint64 {
 	return res
 }
 
-var entryHash maphash.Hash
+var conntrackEntryHash maphash.Hash
 
 func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 	srcIP := conn.Src.IP().As4()
-	_, _ = entryHash.Write(srcIP[:])
+	_, _ = conntrackEntryHash.Write(srcIP[:])
 	var srcPort [2]byte
 	binary.LittleEndian.PutUint16(srcPort[:], conn.Src.Port())
-	_, _ = entryHash.Write(srcPort[:])
+	_, _ = conntrackEntryHash.Write(srcPort[:])
 
 	dstIP := conn.Dst.IP().As4()
-	_, _ = entryHash.Write(dstIP[:])
+	_, _ = conntrackEntryHash.Write(dstIP[:])
 	var dstPort [2]byte
 	binary.LittleEndian.PutUint16(dstPort[:], conn.Dst.Port())
-	_, _ = entryHash.Write(dstPort[:])
+	_, _ = conntrackEntryHash.Write(dstPort[:])
 
-	_ = entryHash.WriteByte(conn.Proto)
-	res := entryHash.Sum64()
+	_ = conntrackEntryHash.WriteByte(conn.Proto)
+	res := conntrackEntryHash.Sum64()
 
-	entryHash.Reset()
+	conntrackEntryHash.Reset()
 	return res
 }
 
-func podNetworkEntryKey(metric PodNetworkMetric) uint64 {
+var podNetworkEntryHash maphash.Hash
+
+func podNetworkMetricKey(metric PodNetworkMetric) uint64 {
 	srcIP := []byte(metric.SrcIP)
-	_, _ = entryHash.Write(srcIP[:])
+	_, _ = podNetworkEntryHash.Write(srcIP[:])
 
 	dstIP := []byte(metric.DstIP)
-	_, _ = entryHash.Write(dstIP[:])
+	_, _ = podNetworkEntryHash.Write(dstIP[:])
 
-	_, _ = entryHash.Write([]byte(metric.Proto))
-	res := entryHash.Sum64()
+	_, _ = podNetworkEntryHash.Write([]byte(metric.Proto))
+	res := podNetworkEntryHash.Sum64()
 
-	entryHash.Reset()
+	podNetworkEntryHash.Reset()
 	return res
 }
 
