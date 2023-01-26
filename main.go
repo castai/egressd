@@ -28,10 +28,12 @@ import (
 var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
 	conntrackMode     = flag.String("conntrack-mode", "nf", "")
-	interval          = flag.Duration("interval", 5*time.Second, "")
+	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
+	flushInterval     = flag.Duration("flush-interval", 30*time.Second, "Interval of time for flushing pod network cache")
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
+	metricBufferSize  = flag.Int("metric-buffer-size", 10000, "Amount of entries that metrics buffer allows storing before blocking")
 )
 
 // These should be set via `go build` during a release.
@@ -97,10 +99,12 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 		return err
 	}
 	cfg := collector.Config{
-		Interval:          *interval,
+		ReadInterval:      *readInterval,
+		FlushInterval:     *flushInterval,
 		NodeName:          os.Getenv("NODE_NAME"),
 		ExcludeNamespaces: *excludeNamespaces,
 		CacheItems:        20000,
+		MetricBufferSize:  *metricBufferSize,
 	}
 	coll := collector.New(cfg, log, kubeWatcher, conntracker, collector.CurrentTimeGetter())
 

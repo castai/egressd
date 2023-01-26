@@ -111,9 +111,10 @@ func TestCollector(t *testing.T) {
 	}
 
 	coll := New(Config{
-		Interval:   time.Second,
-		NodeName:   "n1",
-		CacheItems: 1000,
+		ReadInterval:     time.Second,
+		NodeName:         "n1",
+		CacheItems:       1000,
+		MetricBufferSize: 1000,
 	}, log,
 		kubeWatcher,
 		connTracker,
@@ -130,10 +131,11 @@ func TestCollector(t *testing.T) {
 		done <- struct{}{}
 	}()
 
-	err := coll.run()
+	err := coll.collect()
 	r.NoError(err)
-	err = coll.run()
+	err = coll.collect()
 	r.NoError(err)
+	coll.export()
 	close(coll.metricsChan)
 	<-done
 
