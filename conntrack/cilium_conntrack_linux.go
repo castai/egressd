@@ -5,12 +5,27 @@ package conntrack
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/castai/egressd/metrics"
+
 	"github.com/cilium/cilium/pkg/bpf"
+	"github.com/cilium/cilium/pkg/defaults"
 	"github.com/cilium/cilium/pkg/maps/ctmap"
 	"inet.af/netaddr"
 )
+
+// https://raw.githubusercontent.com/cilium/cilium/1324e2d3d2674b872461b21e030ef9d19fa591ae/pkg/defaults/defaults.go
+const (
+	bpfMapRoot = defaults.DefaultMapRoot
+	bpfMaps    = defaults.DefaultMapPrefix
+)
+
+func bpfMapsExist() bool {
+	path := filepath.Join(bpfMapRoot, bpfMaps)
+	file, err := os.Stat(path)
+	return err == nil && file != nil
+}
 
 func listRecords(maps []interface{}, filter EntriesFilter) ([]Entry, error) {
 	entries := make([]Entry, 0)

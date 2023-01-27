@@ -5,6 +5,10 @@ func NewCiliumClient() (Client, error) {
 	return &ciliumClient{maps: maps}, nil
 }
 
+func CiliumAvailable() bool {
+	return bpfMapsExist()
+}
+
 type ciliumClient struct {
 	maps []interface{}
 }

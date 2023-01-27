@@ -26,22 +26,6 @@ spec:
       hostNetwork: true
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if eq .Values.egressd.conntrack "nf"}}
-      initContainers:
-        - name: egressd-init
-          image: busybox:1.35.0
-          command:
-            - "/bin/sh"
-            - "-c"
-            - |
-              /bin/echo "1" > /hostproc/sys/net/netfilter/nf_conntrack_acct
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - mountPath: /hostproc/sys/net/netfilter
-              name: netfilter
-              mountPropagation: Bidirectional
-      {{- end }}
       containers:
         - name: egressd
           securityContext:
@@ -53,7 +37,6 @@ spec:
           command:
             - "/usr/local/bin/egressd"
           args:
-            - "-conntrack-mode={{.Values.egressd.conntrack}}"
         {{- range $key, $value := .Values.extraArgs }}
         {{- if $value }}
             - "-{{ $key }}={{ $value }}"
@@ -67,13 +50,14 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
-          {{- if eq .Values.egressd.conntrack "cilium"}}
             - mountPath: /sys/fs/bpf
               mountPropagation: HostToContainer
-              name: bpf-maps
-          {{- end }}
+              name: cilium-bpf-maps
             - mountPath: /var/run/egressd
               name: export-logs
+            - mountPath: /hostproc/sys/net/netfilter
+              name: netfilter
+              mountPropagation: Bidirectional
       {{- if .Values.export.enabled }}
         - name: egressd-export
           image: {{.Values.export.image}}
@@ -99,17 +83,13 @@ spec:
       {{- end }}
       dnsPolicy: {{.Values.dnsPolicy}}
       volumes:
-      {{- if eq .Values.egressd.conntrack "nf"}}
         - name: netfilter
           hostPath:
             path: /proc/sys/net/netfilter
-      {{- end }}
-      {{- if eq .Values.egressd.conntrack "cilium"}}
-        - name: bpf-maps
+        - name: cilium-bpf-maps
           hostPath:
             path: /sys/fs/bpf
             type: DirectoryOrCreate
-      {{- end }}
         - name: export-logs
           hostPath:
             path: /var/run/egressd

@@ -27,7 +27,6 @@ import (
 
 var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
-	conntrackMode     = flag.String("conntrack-mode", "nf", "")
 	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
 	flushInterval     = flag.Duration("flush-interval", 30*time.Second, "Interval of time for flushing pod network cache")
 	httpAddr          = flag.String("http-addr", ":6060", "")
@@ -86,15 +85,14 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 
 	kubeWatcher := kube.NewWatcher(clientset)
 	var conntracker conntrack.Client
-	switch *conntrackMode {
-	case "nf":
-		conntracker, err = conntrack.NewNetfilterClient(log)
-	case "cilium":
+
+	ciliumAvailable := conntrack.CiliumAvailable()
+	if ciliumAvailable {
 		conntracker, err = conntrack.NewCiliumClient()
-	default:
-		return fmt.Errorf("unsupported conntract-mode %q", *conntrackMode)
+	} else {
+		conntracker, err = conntrack.NewNetfilterClient(log)
 	}
-	defer conntracker.Close()
+
 	if err != nil {
 		return err
 	}
