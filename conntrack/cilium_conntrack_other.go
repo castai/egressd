@@ -13,3 +13,7 @@ func listRecords(maps []interface{}, filter EntriesFilter) ([]Entry, error) {
 func initMaps() []interface{} {
 	return nil
 }
+
+func bpfMapsExist() bool {
+	return false
+}

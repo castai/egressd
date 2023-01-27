@@ -50,9 +50,6 @@ dnsPolicy: ClusterFirstWithHostNet
 
 extraArgs: []
 
-egressd:
-  conntrack: "nf" # Conntrack mode. Available values "nf" or "cilium"
-
 export:
   enabled: true
   image: timberio/vector:0.25.1-alpine
