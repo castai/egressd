@@ -37,6 +37,10 @@ spec:
           command:
             - "/usr/local/bin/egressd"
           args:
+            - "-export-mode={{.Values.export.mode}}"
+        {{- if eq .Values.export.mode "http" }}
+            - "-export-http-addr={{.Values.export.http.addr}}"
+        {{- end }}
         {{- range $key, $value := .Values.extraArgs }}
         {{- if $value }}
             - "-{{ $key }}={{ $value }}"
@@ -58,7 +62,7 @@ spec:
             - mountPath: /hostproc/sys/net/netfilter
               name: netfilter
               mountPropagation: Bidirectional
-      {{- if .Values.export.enabled }}
+      {{- if and (.Values.export.enabled) (eq .Values.export.mode "file") }}
         - name: egressd-export
           image: {{.Values.export.image}}
           imagePullPolicy: IfNotPresent

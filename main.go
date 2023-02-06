@@ -30,6 +30,8 @@ var (
 	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
 	flushInterval     = flag.Duration("flush-interval", 30*time.Second, "Interval of time for flushing pod network cache")
 	httpAddr          = flag.String("http-addr", ":6060", "")
+	exportMode        = flag.String("export-mode", "http", "Export mode. Available values: http,file")
+	exportHTTPAddr    = flag.String("export-http-addr", "http://egressd-aggregator:6000", "Export to vector aggregator http source")
 	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
 	metricBufferSize  = flag.Int("metric-buffer-size", 10000, "Amount of entries that metrics buffer allows storing before blocking")
@@ -106,18 +108,24 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 	}
 	coll := collector.New(cfg, log, kubeWatcher, conntracker, collector.CurrentTimeGetter())
 
-	if *exportFileName != "" {
-		export := exporter.New(exporter.Config{
-			ExportFilename:      *exportFileName,
-			ExportFileMaxSizeMB: 10,
-			MaxBackups:          3,
-			Compress:            false,
-		}, log, coll)
-		go func() {
-			if err := export.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-				log.Errorf("exporter failed: %v", err)
-			}
-		}()
+	switch *exportMode {
+	case "http":
+	case "file":
+		if *exportFileName != "" {
+			export := exporter.NewFileExporter(exporter.FileConfig{
+				ExportFilename:      *exportFileName,
+				ExportFileMaxSizeMB: 10,
+				MaxBackups:          3,
+				Compress:            false,
+			}, log, coll)
+			go func() {
+				if err := export.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+					log.Errorf("exporter failed: %v", err)
+				}
+			}()
+		} else {
+			return errors.New("export file name is empty")
+		}
 	}
 
 	return coll.Start(ctx)

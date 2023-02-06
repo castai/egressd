@@ -1,6 +1,22 @@
 # Default values for egressd.
 # Declare variables to be passed into your templates.
 
+# CAST AI API configuration.
+castai:
+  # Token to be used for authorizing agent access to the CASTAI API
+  apiKey: ""
+
+  # Name of secret with Token to be used for authorizing agent access to the API
+  # apiKey and apiKeySecretRef are mutually exclusive
+  # The referenced secret must provide the token in .data["API_KEY"]
+  apiKeySecretRef: ""
+
+  # CASTAI public api url.
+  apiURL: "https://api.cast.ai"
+
+  # CASTAI Cluster unique identifier.
+  clusterID: ""
+
 image:
   repository: ghcr.io/castai/egressd/egressd
   pullPolicy: IfNotPresent
@@ -48,26 +64,31 @@ affinity: {}
 
 dnsPolicy: ClusterFirstWithHostNet
 
-extraArgs: []
+# Extra args for egressd container.
+extraArgs:
+  # metric-buffer-size: 10000
 
 export:
   enabled: true
-  image: timberio/vector:0.25.1-alpine
-  resources: {}
-  securityContext: {}
-  vectorConfig: |
-    sources:
-      logs:
-        type: file
-        ignore_older_secs: 600
-        include:
-          - /var/run/egressd/egressd.log
-        read_from: end
-
-    sinks:
-      vector_aggregator:
-        type: vector
-        inputs:
-          - logs
-        address: vector-headless.egressd.svc.cluster.local:6000
-
+  mode: "http"
+  http:
+    addr: http://egressd-aggregator:6060
+  file:
+    image: timberio/vector:0.25.1-alpine
+    resources: {}
+    securityContext: {}
+    vectorConfig: |
+      sources:
+        logs:
+          type: file
+          ignore_older_secs: 600
+          include:
+            - /var/run/egressd/egressd.log
+          read_from: end
+  
+      sinks:
+        vector_aggregator:
+          type: vector
+          inputs:
+            - logs
+          address: vector-headless.egressd.svc.cluster.local:6000

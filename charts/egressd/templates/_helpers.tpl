@@ -60,3 +60,28 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+
+{{- define "egressd.aggregator.fullname" -}}
+{{ include "egressd.fullname" . }}-aggregator
+{{- end }}
+
+{{/*
+Common aggregator labels
+*/}}
+{{- define "egressd.aggregator.labels" -}}
+helm.sh/chart: {{ include "egressd.chart" . }}
+{{ include "egressd.aggregator.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "egressd.aggregator.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "egressd.name" . }}-aggregator
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

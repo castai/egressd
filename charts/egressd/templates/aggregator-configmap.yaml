@@ -1,0 +1,50 @@
+{{- if .Values.castai.clusterID }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "egressd.aggregator.fullname" . }}
+  labels:
+    {{- include "egressd.aggregator.labels" . | nindent 4 }}
+data:
+  vector.yaml: |
+    api:
+      address: 127.0.0.1:8686
+      enabled: true
+      playground: false
+    data_dir: /vector-data-dir
+    sources:
+      internal_metrics:
+        type: internal_metrics
+      vector:
+        address: 0.0.0.0:6000
+        type: vector
+        version: "2"
+    sinks:
+      prom_exporter:
+        type: prometheus_exporter
+        inputs: [ internal_metrics ]
+        address: 0.0.0.0:9090
+
+      castai:
+        type: http
+        inputs:
+          - vector
+        uri: "{{.Values.castai.apiURL}}/v1/security/egress/{{.Values.castai.clusterID}}"
+        compression: gzip
+        encoding:
+          codec: json
+        batch:
+          max_bytes: 10485760 # 10MB not compressed size.
+          timeout_secs: 120
+        request:
+          headers:
+            X-API-Key: "${CASTAI_API_KEY}"
+
+{{/*      stdout:*/}}
+{{/*        type: console*/}}
+{{/*        inputs:*/}}
+{{/*          - logs*/}}
+{{/*        encoding:*/}}
+{{/*          codec: json*/}}
+
+{{- end}}

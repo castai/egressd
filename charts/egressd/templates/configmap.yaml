@@ -2,5 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "egressd.fullname" . }}
+  labels:
+    {{- include "egressd.labels" . | nindent 4 }}
 data:
   vector-config.yaml: {{- toYaml .Values.export.vectorConfig | nindent 8 }}
