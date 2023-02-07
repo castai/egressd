@@ -1,0 +1,163 @@
+package main
+
+import (
+	"compress/gzip"
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"sync"
+	"time"
+
+	"github.com/castai/egressd/collector"
+	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/json"
+)
+
+var (
+	imageTag = flag.String("image-tag", "", "Egressd docker image tag")
+	timeout  = flag.Duration("timeout", 1*time.Minute, "Test timeout")
+	ns       = flag.String("ns", "castai-egressd-e2e", "Namespace")
+)
+
+func main() {
+	flag.Parse()
+	log := logrus.New()
+	if err := run(log); err != nil {
+		log.Error(err)
+		time.Sleep(5 * time.Second)
+		os.Exit(-1)
+	}
+}
+
+func run(log logrus.FieldLogger) error {
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+
+	if *imageTag == "" {
+		return errors.New("image-tag flag is not set")
+	}
+
+	api := &mockAPI{log: log}
+	go api.start()
+
+	out, err := installChart(*ns, *imageTag)
+	if err != nil {
+		return fmt.Errorf("installing chart: %w: %s", err, string(out))
+	}
+	fmt.Printf("installed chart:\n%s\n", out)
+
+	if err := api.assertLogsReceived(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func installChart(ns, imageTag string) ([]byte, error) {
+	fmt.Printf("installing egressd chart with image tag %q", imageTag)
+	podIP := os.Getenv("POD_IP")
+	apiURL := fmt.Sprintf("http://%s:8090", podIP)
+	repo := "ghcr.io/castai/egressd/egressd"
+	if imageTag == "local" {
+		repo = "egressd"
+	}
+	//nolint:gosec
+	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf(`helm upgrade --install castai-egressd ./charts/egressd \
+  -n %s --create-namespace \
+  --set image.repository=%s \
+  --set image.tag=%s \
+  --set castai.apiURL=%s \
+  --set castai.clusterID=e2e \
+  --set castai.apiKey=key \
+  --set extraArgs.flush-interval=5s \
+  --set aggregator.logToStdout=true \
+  --set aggregator.castaiSink.timeoutSecs=5 \
+  --wait --timeout=1m`, ns, repo, imageTag, apiURL))
+	return cmd.CombinedOutput()
+}
+
+type mockAPI struct {
+	log logrus.FieldLogger
+
+	mu           sync.Mutex
+	receivedLogs [][]byte
+}
+
+func (m *mockAPI) start() {
+	router := mux.NewRouter()
+
+	router.HandleFunc("/v1/security/egress/{cluster_id}", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		clusterID := vars["cluster_id"]
+		gz, err := gzip.NewReader(r.Body)
+		if err != nil {
+			m.log.Errorf("gzip reader: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer gz.Close()
+
+		rawBody, err := io.ReadAll(gz)
+		if err != nil {
+			m.log.Errorf("read body: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Printf("received logs, cluster_id=%s, body=%d\n", clusterID, len(rawBody))
+		m.mu.Lock()
+		m.receivedLogs = append(m.receivedLogs, rawBody)
+		m.mu.Unlock()
+
+		w.WriteHeader(http.StatusAccepted)
+	})
+
+	if err := http.ListenAndServe(":8090", router); err != nil { //nolint:gosec
+		m.log.Fatal(err)
+	}
+}
+
+func (m *mockAPI) getLogs() ([]collector.PodNetworkMetric, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var res []collector.PodNetworkMetric
+	for _, chunk := range m.receivedLogs {
+		var tmp []collector.PodNetworkMetric
+		if err := json.Unmarshal(chunk, &tmp); err != nil {
+			return nil, err
+		}
+		res = append(res, tmp...)
+	}
+	return res, nil
+}
+
+func (m *mockAPI) assertLogsReceived(ctx context.Context) error {
+	for {
+		select {
+		case <-time.After(5 * time.Second):
+			logs, err := m.getLogs()
+			if err != nil {
+				return err
+			}
+			if len(logs) == 0 {
+				continue
+			}
+			logEntry := logs[0]
+			if logEntry.SrcIP == "" {
+				return errors.New("source ip is missing")
+			}
+			if logEntry.DstIP == "" {
+				return errors.New("dest ip is missing")
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("waiting for received logs: %w", ctx.Err())
+		}
+	}
+}

@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  CR_CONFIGFILE: "${{ github.workspace }}/cr.yaml"
+  CT_CONFIGFILE: "${{ github.workspace }}/ct.yaml"
+  CR_INDEX_PATH: "${{ github.workspace }}/.cr-index"
+  CR_PACKAGE_PATH: "${{ github.workspace }}/.cr-release-packages"
+  CR_TOOL_PATH: "${{ github.workspace }}/.cr-tool"
+  CHART_PATH: "${{ github.workspace }}/charts/egressd"
+
+jobs:
+  release_docker:
+    name: Release Docker
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup Go 1.20
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.20
+
+      - name: Cache Go modules
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-build-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-build-
+
+      - name: Get release tag
+        run: echo "RELEASE_TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: Build go binary
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: 0
+
+      - name: Login to GitHub Container Registry
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push release
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          file: ./Dockerfile
+          tags: |
+            ghcr.io/castai/egressd/egressd:${{ env.RELEASE_TAG }}
+            ghcr.io/castai/egressd/egressd:latest
+
+  release_chart:
+    name: Release Helm Chart
+    runs-on: ubuntu-20.04
+    needs: release_docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: '0'
+
+      - name: Get release tag
+        run: echo "RELEASE_TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: Checkout helm-charts
+        # The cr tool only works if the target repository is already checked out
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: castai/helm-charts
+          path: helm-charts
+          token: ${{ secrets.HELM_CHARTS_REPO_TOKEN }}
+
+      - name: Configure Git for helm-charts
+        run: |
+          cd helm-charts
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.5.2
+
+      - name: Install CR tool
+        run: |
+          mkdir "${CR_TOOL_PATH}"
+          mkdir "${CR_PACKAGE_PATH}"
+          mkdir "${CR_INDEX_PATH}"
+          curl -sSLo cr.tar.gz "https://github.com/helm/chart-releaser/releases/download/v1.4.0/chart-releaser_1.4.0_linux_amd64.tar.gz"
+          tar -xzf cr.tar.gz -C "${CR_TOOL_PATH}"
+          rm -f cr.tar.gz
+
+      - name: Bump chart version
+        run: |
+          python ./.github/workflows/bump_chart.py ${CHART_PATH}/Chart.yaml ${{env.RELEASE_TAG}}
+
+      - name: Parse Chart.yaml
+        id: parse-chart
+        run: |
+          description=$(yq ".description" < ${CHART_PATH}/Chart.yaml)
+          name=$(yq ".name" < ${CHART_PATH}/Chart.yaml)
+          version=$(yq ".version" < ${CHART_PATH}/Chart.yaml)
+          echo "::set-output name=chartpath::${CHART_PATH}"
+          echo "::set-output name=desc::${description}"
+          if [[ -n "${HELM_TAG_PREFIX}" ]]; then
+            echo "::set-output name=tagname::${name}-${version}"
+          else
+            echo "::set-output name=tagname::${name}-${version}"
+          fi
+          echo "::set-output name=packagename::${name}-${version}"
+
+      - name: Create helm package
+        run: |
+          "${CR_TOOL_PATH}/cr" package "${{ steps.parse-chart.outputs.chartpath }}" --config "${CR_CONFIGFILE}" --package-path "${CR_PACKAGE_PATH}"
+          echo "Result of chart package:"
+          ls -l "${CR_PACKAGE_PATH}"
+          git status
+
+      - name: Make helm charts github release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            ${{ steps.parse-chart.outputs.desc }}
+            Source commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+          files: |
+            ${{ env.CR_PACKAGE_PATH }}/${{ steps.parse-chart.outputs.packagename }}.tgz
+            ${{ env.CR_PACKAGE_PATH }}/${{ steps.parse-chart.outputs.packagename }}.tgz.prov
+          repository: castai/helm-charts
+          tag_name: ${{ steps.parse-chart.outputs.tagname }}
+          token: ${{ secrets.HELM_CHARTS_REPO_TOKEN }}
+
+      - name: Update helm repo index.yaml
+        run: |
+          cd helm-charts
+          "${CR_TOOL_PATH}/cr" index --config "${CR_CONFIGFILE}" --token "${{ secrets.HELM_CHARTS_REPO_TOKEN }}" --index-path "${CR_INDEX_PATH}" --package-path "${CR_PACKAGE_PATH}" --push
+
+      - name: Commit Chart.yaml changes
+        run: |
+          git status
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git checkout main
+          git add ${CHART_PATH}/Chart.yaml
+          git commit -m "[Release] Update Chart.yaml"
+          git push

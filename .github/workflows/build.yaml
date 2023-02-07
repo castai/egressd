@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
   pull_request:
     branches:
       - main
@@ -15,15 +12,24 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-20.04
+    if: ${{ github.event.head_commit.message != '[Release] Update Chart.yaml' }}
     steps:
-
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Setup Go 1.19
+      - name: Get merge request latest commit
+        id: parse-commit
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          msg=$(git show -s --format=%s)
+          echo "head_commit_message=${msg}" >> $GITHUB_ENV
+
+      - name: Setup Go 1.20
         uses: actions/setup-go@v2
         with:
-          go-version: 1.19
+          go-version: 1.20
 
       - name: Cache Go modules
         uses: actions/cache@v2
@@ -32,11 +38,7 @@ jobs:
           key: ${{ runner.os }}-build-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-build-
 
-      - name: Get release tag
-        if: github.event_name == 'release'
-        run: echo "RELEASE_TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-
-      - name: Build Go binary
+      - name: Build egressd go binary
         run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./
         env:
           GOOS: linux
@@ -46,7 +48,7 @@ jobs:
       - name: Run golangci-lint
         # You may pin to the exact commit or the version.
         # uses: golangci/golangci-lint-action@537aa1903e5d359d0b27dbc19ddd22c5087f3fbc
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && !contains(env.head_commit_message, '#skip-lint') }}
         uses: golangci/golangci-lint-action@v3.2.0
         with:
           args: --timeout=5m
@@ -54,10 +56,11 @@ jobs:
           skip-build-cache: true
 
       - name: Test
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && !contains(env.head_commit_message, '#skip-test') }}
         run: go test -race ./...
 
       - name: Login to GitHub Container Registry
+        if: ${{ github.event_name == 'pull_request' }}
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -82,20 +85,34 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/castai/egressd/egressd:${{ github.sha }}
 
-      - name: Build and push release
-        if: github.event_name == 'release'
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          file: ./Dockerfile
-          tags: |
-            ghcr.io/castai/egressd/egressd:${{ github.sha }}
-            ghcr.io/castai/egressd/egressd:latest
+  e2e:
+    name: E2E
+    runs-on: ubuntu-20.04
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
 
-      - name: FOSSA scan docker image (agent)
-        if: github.event_name == 'release'
-        uses: fossas/fossa-action@v1
+      - name: Setup Go 1.20
+        uses: actions/setup-go@v2
         with:
-          api-key: ${{ secrets.FOSSA_API_KEY }}
-          container: ghcr.io/castai/egressd/egressd:${{ env.RELEASE_TAG }}
+          go-version: 1.20
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.4.0
+        with:
+          config: ./e2e/kind-config.yaml
+          cluster_name: e2e
+
+      - name: Run e2e
+        shell: bash
+        run: |
+          KIND_CONTEXT=e2e IMAGE_TAG=${{ github.sha }} ./e2e/run.sh

@@ -1,0 +1,12 @@
+FROM alpine:3.16.2
+
+RUN apk update && apk add curl bash
+RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && VERIFY_CHECKSUM=false ./get_helm.sh
+
+WORKDIR /source
+COPY ./bin/egressd-e2e /usr/local/bin/egressd-e2e
+COPY ./charts ./charts
+ARG image_tag
+ENV env_image_tag $image_tag
+
+CMD ["sh", "-c", "/usr/local/bin/egressd-e2e -image-tag=${env_image_tag}"]

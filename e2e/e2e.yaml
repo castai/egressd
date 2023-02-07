@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: e2e
+  namespace: castai-egressd-e2e
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: e2e
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: e2e
+    namespace: castai-egressd-e2e
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e
+  namespace: castai-egressd-e2e
+  labels:
+    app.kubernetes.io/name: e2e
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: e2e
+    spec:
+      restartPolicy: Never
+      serviceAccountName: e2e
+      containers:
+        - name: e2e
+          image: "egressd-e2e:local"
+          ports:
+            - name: http
+              containerPort: 8090
+          env:
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
