@@ -100,6 +100,8 @@ func (a *Collector) Start(ctx context.Context) error {
 }
 
 func (a *Collector) export() {
+	start := time.Now()
+	a.log.Debugf("flushing collected metrics, count=%d", len(a.podNetworkCache))
 	for key, metric := range a.podNetworkCache {
 		select {
 		case a.metricsChan <- *metric:
@@ -110,6 +112,7 @@ func (a *Collector) export() {
 				"Consider increasing --metrics-buffer-size from current value: %d", a.cfg.MetricBufferSize)
 		}
 	}
+	a.log.Debugf("collected metrics flushed in %s", time.Since(start))
 }
 
 func (a *Collector) collect() error {

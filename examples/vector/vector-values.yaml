@@ -74,13 +74,6 @@ customConfig:
       inputs: [ internal_metrics ]
       address: 0.0.0.0:9090
 
-#    stdout:
-#      type: console
-#      inputs:
-#        - logs
-#      encoding:
-#        codec: json
-
     loki_logs:
       type: loki
       inputs:
@@ -107,3 +100,11 @@ customConfig:
       batch:
         timeout_secs: 5
       endpoint: "http://prom-prometheus-server.egressd.svc.cluster.local/api/v1/write"
+
+    #    stdout:
+    #      type: console
+    #      inputs:
+    #        - logs
+    #      encoding:
+    #        codec: json
+

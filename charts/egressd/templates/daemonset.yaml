@@ -4,6 +4,7 @@ metadata:
   name: {{ include "egressd.fullname" . }}
   labels:
     {{- include "egressd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collector
 spec:
   selector:
     matchLabels:
@@ -37,6 +38,10 @@ spec:
           command:
             - "/usr/local/bin/egressd"
           args:
+            - "-export-mode={{.Values.export.mode}}"
+        {{- if eq .Values.export.mode "http" }}
+            - "-export-http-addr={{.Values.export.http.addr}}"
+        {{- end }}
         {{- range $key, $value := .Values.extraArgs }}
         {{- if $value }}
             - "-{{ $key }}={{ $value }}"
@@ -58,7 +63,7 @@ spec:
             - mountPath: /hostproc/sys/net/netfilter
               name: netfilter
               mountPropagation: Bidirectional
-      {{- if .Values.export.enabled }}
+      {{- if and (.Values.export.enabled) (eq .Values.export.mode "file") }}
         - name: egressd-export
           image: {{.Values.export.image}}
           imagePullPolicy: IfNotPresent
@@ -94,6 +99,7 @@ spec:
           hostPath:
             path: /var/run/egressd
             type: DirectoryOrCreate
+      {{- if and (.Values.export.enabled) (eq .Values.export.mode "file") }}
         - name: egressd-vector-config
           configMap:
             defaultMode: 420
@@ -101,6 +107,7 @@ spec:
               - key: vector-config.yaml
                 path: vector-config.yaml
             name: {{ include "egressd.fullname" . }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

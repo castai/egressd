@@ -51,6 +51,7 @@ k8s_yaml(helm(
     name='egressd',
     namespace=namespace,
     set=[
-      'image.repository=localhost:5000/egressd'
+      'image.repository=localhost:5000/egressd',
+      'aggregator.logToStdout=true'
     ]
 ))
