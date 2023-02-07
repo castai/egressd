@@ -100,6 +100,7 @@ func (a *Collector) Start(ctx context.Context) error {
 }
 
 func (a *Collector) export() {
+	a.log.Debugf("flushing collected metrics, count=%d", len(a.podNetworkCache))
 	for key, metric := range a.podNetworkCache {
 		select {
 		case a.metricsChan <- *metric:

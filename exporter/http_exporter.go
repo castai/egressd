@@ -49,7 +49,7 @@ func (e *HTTPExporter) Start(ctx context.Context) error {
 }
 
 func (e *HTTPExporter) sendMetric(m *collector.PodNetworkMetric) error {
-	jsonBytes, err := jsoniter.Marshal(m)
+	jsonBytes, err := jsoniter.ConfigFastest.Marshal(m)
 	if err != nil {
 		return err
 	}
@@ -66,5 +66,6 @@ func (e *HTTPExporter) sendMetric(m *collector.PodNetworkMetric) error {
 		msg, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("expected export http status 200, got %d, err: %s", resp.StatusCode, string(msg))
 	}
+	metrics.IncExportedEvents()
 	return nil
 }

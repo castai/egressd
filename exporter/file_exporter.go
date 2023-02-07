@@ -38,7 +38,7 @@ func (e *FileExporter) Start(ctx context.Context) error {
 		Compress:   e.cfg.Compress,
 	}
 
-	encoder := jsoniter.NewEncoder(writer)
+	encoder := jsoniter.ConfigFastest.NewEncoder(writer)
 
 	for {
 		select {

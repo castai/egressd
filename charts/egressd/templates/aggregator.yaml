@@ -1,4 +1,4 @@
-{{- if .Values.castai.clusterID }}
+{{if .Values.aggregator.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -6,7 +6,6 @@ metadata:
   labels:
     {{- include "egressd.aggregator.labels" . | nindent 4 }}
 spec:
-  clusterIP: None
   ports:
     - name: api
       port: 8686
@@ -20,6 +19,10 @@ spec:
       port: 6000
       protocol: TCP
       targetPort: 6000
+    - name: http-server
+      port: 80
+      protocol: TCP
+      targetPort: 8080
   selector:
     {{- include "egressd.aggregator.selectorLabels" . | nindent 4 }}
   type: ClusterIP
@@ -30,19 +33,20 @@ metadata:
   name: {{ include "egressd.aggregator.fullname" . }}
   labels:
     {{- include "egressd.aggregator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aggregator
 spec:
   replicas: 1
   podManagementPolicy: OrderedReady
   selector:
     matchLabels:
-      {{- include "egressd.aggregator.selectorLabels" . | nindent 4 }}
+      {{- include "egressd.aggregator.selectorLabels" . | nindent 6 }}
   serviceName: {{ include "egressd.aggregator.fullname" . }}-headless
   template:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/aggregator-configmap.yaml") . | sha256sum }}
       labels:
-        {{- include "egressd.aggregator.labels" . | nindent 4 }}
+        {{- include "egressd.aggregator.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "egressd.serviceAccountName" . }}
       dnsPolicy: ClusterFirst
@@ -57,7 +61,7 @@ spec:
             - name: CASTAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{- include "egressd.fullname" }}
+                  name: "{{- include "egressd.fullname" . }}"
                   key: API_KEY
                   optional: true
           ports:
@@ -69,6 +73,9 @@ spec:
               protocol: TCP
             - name: vector
               containerPort: 6000
+              protocol: TCP
+            - name: http-server
+              containerPort: 8080
               protocol: TCP
           volumeMounts:
             - name: data
@@ -85,4 +92,4 @@ spec:
             sources:
               - configMap:
                   name: {{ include "egressd.aggregator.fullname" . }}
-{{- end}}
+{{- end }}

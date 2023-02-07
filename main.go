@@ -28,7 +28,7 @@ import (
 var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
 	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
-	flushInterval     = flag.Duration("flush-interval", 30*time.Second, "Interval of time for flushing pod network cache")
+	flushInterval     = flag.Duration("flush-interval", 60*time.Second, "Interval of time for flushing pod network cache")
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportMode        = flag.String("export-mode", "http", "Export mode. Available values: http,file")
 	exportHTTPAddr    = flag.String("export-http-addr", "http://egressd-aggregator:6000", "Export to vector aggregator http source")
@@ -73,7 +73,7 @@ func main() {
 }
 
 func run(ctx context.Context, log logrus.FieldLogger) error {
-	log.Infof("running egressd, version=%s, commit=%s, ref=%s", Version, GitCommit, GitRef)
+	log.Infof("running egressd, version=%s, commit=%s, ref=%s, read-interval=%s, flush-interval=%s", Version, GitCommit, GitRef, *readInterval, *flushInterval)
 
 	restconfig, err := retrieveKubeConfig(log, *kubeconfig)
 	if err != nil {
@@ -110,6 +110,12 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 
 	switch *exportMode {
 	case "http":
+		export := exporter.NewHTTPExporter(exporter.HTTPConfig{Addr: *exportHTTPAddr}, log, coll)
+		go func() {
+			if err := export.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Errorf("exporter failed: %v", err)
+			}
+		}()
 	case "file":
 		if *exportFileName != "" {
 			export := exporter.NewFileExporter(exporter.FileConfig{
@@ -126,6 +132,8 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 		} else {
 			return errors.New("export file name is empty")
 		}
+	default:
+		return fmt.Errorf("export mode %q is not supported", *exportMode)
 	}
 
 	return coll.Start(ctx)

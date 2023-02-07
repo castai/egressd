@@ -1,3 +1,4 @@
+{{- if and (.Values.export.enabled) (eq .Values.export.mode "file") }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -5,4 +6,6 @@ metadata:
   labels:
     {{- include "egressd.labels" . | nindent 4 }}
 data:
-  vector-config.yaml: {{- toYaml .Values.export.vectorConfig | nindent 8 }}
+  vector-config.yaml: {{- toYaml .Values.export.file.vectorConfig | nindent 8 }}
+{{- end }}
+

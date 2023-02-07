@@ -72,7 +72,7 @@ export:
   enabled: true
   mode: "http"
   http:
-    addr: http://egressd-aggregator:6060
+    addr: http://egressd-aggregator:80
   file:
     image: timberio/vector:0.25.1-alpine
     resources: {}
@@ -85,10 +85,13 @@ export:
           include:
             - /var/run/egressd/egressd.log
           read_from: end
-  
       sinks:
         vector_aggregator:
           type: vector
           inputs:
             - logs
-          address: vector-headless.egressd.svc.cluster.local:6000
+          address: egressd-aggregator:6000
+
+aggregator:
+  enabled: true
+  logToStdout: false
