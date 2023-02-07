@@ -15,6 +15,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var retryBackoff = []time.Duration{
+	10 * time.Millisecond,
+	50 * time.Millisecond,
+	100 * time.Millisecond,
+}
+
 type HTTPConfig struct {
 	Addr string
 }
@@ -58,15 +64,42 @@ func (e *HTTPExporter) sendMetric(ctx context.Context, m *collector.PodNetworkMe
 	if err != nil {
 		return err
 	}
-	resp, err := e.client.Do(req)
-	if err != nil {
+
+	send := func() error {
+		resp, err := e.client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			msg, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("expected export http status 200, got %d, err: %s", resp.StatusCode, string(msg))
+		}
+		return nil
+	}
+
+	backoff := func(fn func() error) error {
+		var err error
+		for _, b := range retryBackoff {
+			e.log.Debug("calling send")
+			err = fn()
+			if err == nil {
+				return nil
+			}
+			e.log.Warnf("failed to send metrics, sleeping %s: %v", b, err)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(b):
+			}
+		}
 		return err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		msg, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("expected export http status 200, got %d, err: %s", resp.StatusCode, string(msg))
+
+	if err := backoff(send); err != nil {
+		return err
 	}
+
 	metrics.IncExportedEvents()
 	return nil
 }
