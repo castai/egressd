@@ -3,6 +3,7 @@ package exporter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -41,19 +42,19 @@ func (e *HTTPExporter) Start(ctx context.Context) error {
 			return ctx.Err()
 		case metric := <-e.metrics.GetMetricsChan():
 			metrics.IncExportedEvents()
-			if err := e.sendMetric(&metric); err != nil {
+			if err := e.sendMetric(ctx, &metric); err != nil && !errors.Is(err, context.Canceled) {
 				e.log.Errorf("writing metric to http server: %v", err)
 			}
 		}
 	}
 }
 
-func (e *HTTPExporter) sendMetric(m *collector.PodNetworkMetric) error {
+func (e *HTTPExporter) sendMetric(ctx context.Context, m *collector.PodNetworkMetric) error {
 	jsonBytes, err := jsoniter.ConfigFastest.Marshal(m)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("POST", e.cfg.Addr, bytes.NewBuffer(jsonBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", e.cfg.Addr, bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return err
 	}
