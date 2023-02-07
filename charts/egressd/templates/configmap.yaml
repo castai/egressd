@@ -8,4 +8,3 @@ metadata:
 data:
   vector-config.yaml: {{- toYaml .Values.export.file.vectorConfig | nindent 8 }}
 {{- end }}
-
