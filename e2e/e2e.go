@@ -21,7 +21,7 @@ import (
 
 var (
 	imageTag = flag.String("image-tag", "", "Egressd docker image tag")
-	timeout  = flag.Duration("timeout", 1*time.Minute, "Test timeout")
+	timeout  = flag.Duration("timeout", 90*time.Second, "Test timeout")
 	ns       = flag.String("ns", "castai-egressd-e2e", "Namespace")
 )
 
@@ -141,7 +141,7 @@ func (m *mockAPI) getLogs() ([]collector.PodNetworkMetric, error) {
 func (m *mockAPI) assertLogsReceived(ctx context.Context) error {
 	for {
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(3 * time.Second):
 			logs, err := m.getLogs()
 			if err != nil {
 				return err
