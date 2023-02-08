@@ -24,7 +24,7 @@ kind load docker-image $name-e2e:local --name $KIND_CONTEXT
 
 if [ "$IMAGE_TAG" == "local" ]
 then
-  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/castai-$name .
+  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name .
   docker build . -t $name:local -f Dockerfile
   kind load docker-image $name:local --name $KIND_CONTEXT
 fi
@@ -37,6 +37,10 @@ function printJobLogs() {
   kubectl get pods -owide
   echo "E2E Job logs:"
   kubectl logs -l job-name=e2e --tail=-1
+  echo "Egressd logs:"
+  kubectl logs -l app.kubernetes.io/name=egressd
+  echo "Egressd aggregator logs:"
+  kubectl logs -l app.kubernetes.io/name=egressd-aggregator
 }
 trap printJobLogs EXIT
 
