@@ -156,6 +156,7 @@ func (m *mockAPI) assertLogsReceived(ctx context.Context) error {
 			if logEntry.DstIP == "" {
 				return errors.New("dest ip is missing")
 			}
+			return nil
 		case <-ctx.Done():
 			return fmt.Errorf("waiting for received logs: %w", ctx.Err())
 		}
