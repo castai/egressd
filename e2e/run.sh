@@ -51,7 +51,13 @@ kubectl config set-context --current --namespace=$ns
 # Create job pod. It will install egressd helm chart inside the k8s.
 kubectl apply -f ./e2e/e2e.yaml
 # Make sure egressd is running.
-kubectl wait --for=condition=ready --timeout=20s pod -l app.kubernetes.io/name=egressd
+for (( i=1; i<=20; i++ ))
+do
+    if eval kubectl get ds castai-egressd; then
+        break
+    fi
+    sleep 1
+done
 # Deploy some basic http communication services. Now we should get some conntrack records.
 kubectl apply -f ./e2e/conn-generator.yaml
 echo "Waiting for job to finish"
