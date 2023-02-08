@@ -1,0 +1,117 @@
+metadata:
+  name: echo-a
+  labels:
+    name: echo-a
+spec:
+  ports:
+    - name: http
+      port: 8080
+  type: ClusterIP
+  selector:
+    name: echo-a
+apiVersion: v1
+kind: Service
+---
+metadata:
+  name: echo-a
+  labels:
+    name: echo-a
+spec:
+  template:
+    metadata:
+      labels:
+        name: echo-a
+    spec:
+      hostNetwork: false
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: echo-a-container
+          env:
+            - name: PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
+          image: quay.io/cilium/json-mock:v1.3.2@sha256:bc6c46c74efadb135bc996c2467cece6989302371ef4e3f068361460abaf39be
+          imagePullPolicy: IfNotPresent
+          readinessProbe:
+            timeoutSeconds: 7
+            exec:
+              command:
+                - curl
+                - -sS
+                - --fail
+                - --connect-timeout
+                - "5"
+                - -o
+                - /dev/null
+                - localhost:8080
+          livenessProbe:
+            timeoutSeconds: 7
+            exec:
+              command:
+                - curl
+                - -sS
+                - --fail
+                - --connect-timeout
+                - "5"
+                - -o
+                - /dev/null
+                - localhost:8080
+  selector:
+    matchLabels:
+      name: echo-a
+  replicas: 1
+apiVersion: apps/v1
+kind: Deployment
+---
+metadata:
+  name: pod-to-a
+  labels:
+    name: pod-to-a
+spec:
+  template:
+    metadata:
+      labels:
+        name: pod-to-a
+    spec:
+      hostNetwork: false
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: pod-to-a-container
+          ports: []
+          image: quay.io/cilium/alpine-curl:v1.5.0@sha256:7b286939730d8af1149ef88dba15739d8330bb83d7d9853a23e5ab4043e2d33c
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/ash
+            - -c
+            - sleep 1000000000
+          readinessProbe:
+            timeoutSeconds: 7
+            exec:
+              command:
+                - curl
+                - -sS
+                - --fail
+                - --connect-timeout
+                - "5"
+                - -o
+                - /dev/null
+                - echo-a:8080/public
+          livenessProbe:
+            timeoutSeconds: 7
+            exec:
+              command:
+                - curl
+                - -sS
+                - --fail
+                - --connect-timeout
+                - "5"
+                - -o
+                - /dev/null
+                - echo-a:8080/public
+  selector:
+    matchLabels:
+      name: pod-to-a
+  replicas: 1
+apiVersion: apps/v1
+kind: Deployment
