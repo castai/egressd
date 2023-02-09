@@ -7,7 +7,6 @@ on:
 
 env:
   CR_CONFIGFILE: "${{ github.workspace }}/cr.yaml"
-  CT_CONFIGFILE: "${{ github.workspace }}/ct.yaml"
   CR_INDEX_PATH: "${{ github.workspace }}/.cr-index"
   CR_PACKAGE_PATH: "${{ github.workspace }}/.cr-release-packages"
   CR_TOOL_PATH: "${{ github.workspace }}/.cr-tool"
