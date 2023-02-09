@@ -2,5 +2,5 @@ apiVersion: v2
 name: egressd
 description: Kubernetes aware network traffic monitoring
 type: application
-version: 0.1.0
-appVersion: "f0bd83ef7a64224e87d918f84c67fba64d372b9b"
+version: 0.1.1
+appVersion: "v0.4.0"
