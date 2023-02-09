@@ -12,10 +12,10 @@ type PodNetworkMetric struct {
 	DstNamespace string `json:"dst_namespace,omitempty"`
 	DstNode      string `json:"dst_node,omitempty"`
 	DstZone      string `json:"dst_zone,omitempty"`
-	TxBytes      uint64 `json:"tx_bytes"`
-	TxPackets    uint64 `json:"tx_packets"`
-	RxBytes      uint64 `json:"rx_bytes"`
-	RxPackets    uint64 `json:"rx_packets"`
+	TxBytes      uint64 `json:"tx_bytes,omitempty"`
+	TxPackets    uint64 `json:"tx_packets,omitempty"`
+	RxBytes      uint64 `json:"rx_bytes,omitempty"`
+	RxPackets    uint64 `json:"rx_packets,omitempty"`
 	Proto        string `json:"proto"`
 	TS           uint64 `json:"ts"`
 }
