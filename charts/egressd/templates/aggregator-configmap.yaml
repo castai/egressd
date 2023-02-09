@@ -32,14 +32,14 @@ data:
       castai:
         type: http
         inputs:
-          - vector
+          - http_server
         uri: "{{.Values.castai.apiURL}}/v1/security/egress/{{.Values.castai.clusterID}}"
         compression: gzip
         encoding:
           codec: json
         batch:
-          max_bytes: 10485760 # 10MB not compressed size.
-          timeout_secs: 60
+          max_bytes: {{ .Values.aggregator.castaiSink.maxBytes }}
+          timeout_secs: {{ .Values.aggregator.castaiSink.timeoutSecs }}
         request:
           headers:
             X-API-Key: "${CASTAI_API_KEY}"

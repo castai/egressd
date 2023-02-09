@@ -85,3 +85,19 @@ Selector labels
 app.kubernetes.io/name: {{ include "egressd.name" . }}-aggregator
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{- define "egressd.export.http.addr" -}}
+{{- if .Values.export.http.addr }}
+{{- .Values.export.http.addr}}
+{{- else }}
+{{- printf "http://%s:80" (include "egressd.aggregator.fullname" .) }}
+{{- end }}
+{{- end }}
+
+{{- define "egressd.export.file.addr" -}}
+{{- if .Values.export.http.addr }}
+{{- .Values.export.http.addr}}
+{{- else }}
+{{- printf "%s:6000" (include "egressd.aggregator.fullname" .) }}
+{{- end }}
+{{- end }}

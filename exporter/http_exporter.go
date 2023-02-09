@@ -81,7 +81,6 @@ func (e *HTTPExporter) sendMetric(ctx context.Context, m *collector.PodNetworkMe
 	backoff := func(fn func() error) error {
 		var err error
 		for _, b := range retryBackoff {
-			e.log.Debug("calling send")
 			err = fn()
 			if err == nil {
 				return nil

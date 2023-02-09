@@ -40,7 +40,7 @@ spec:
           args:
             - "-export-mode={{.Values.export.mode}}"
         {{- if eq .Values.export.mode "http" }}
-            - "-export-http-addr={{.Values.export.http.addr}}"
+            - "-export-http-addr={{ include "egressd.export.http.addr" . }}"
         {{- end }}
         {{- range $key, $value := .Values.extraArgs }}
         {{- if $value }}
