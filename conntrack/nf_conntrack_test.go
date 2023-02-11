@@ -21,7 +21,7 @@ func TestNetfilterConntrack(t *testing.T) {
 
 	res, err := client.ListEntries(All())
 	r.NoError(err)
-	r.Len(res, 43)
+	r.Len(res, 86)
 
 	byIP := filterEntriesBySrcIP(res, netaddr.MustParseIP("10.20.18.11"))
 	r.Len(byIP, 1)
@@ -47,18 +47,18 @@ func TestNetfilterConntrack(t *testing.T) {
 		Proto:     6,
 	}, byIPViaService[0])
 
-	resByIpFilter, err := client.ListEntries(FilterByIPs(map[netaddr.IP]struct{}{
+	resByIpFilter, err := client.ListEntries(FilterBySrcIP(map[netaddr.IP]struct{}{
 		netaddr.MustParseIP("10.20.3.38"): {},
 	}))
 	r.NoError(err)
 	r.Len(resByIpFilter, 1)
 }
 
-func filterEntriesBySrcIP(entries []Entry, ip netaddr.IP) []Entry {
+func filterEntriesBySrcIP(entries []*Entry, ip netaddr.IP) []Entry {
 	res := make([]Entry, 0)
 	for _, e := range entries {
 		if e.Src.IP() == ip {
-			res = append(res, e)
+			res = append(res, *e)
 		}
 	}
 	return res

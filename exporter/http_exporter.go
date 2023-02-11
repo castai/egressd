@@ -48,7 +48,7 @@ func (e *HTTPExporter) Start(ctx context.Context) error {
 			return ctx.Err()
 		case metric := <-e.metrics.GetMetricsChan():
 			metrics.IncExportedEvents()
-			if err := e.sendMetric(ctx, &metric); err != nil && !errors.Is(err, context.Canceled) {
+			if err := e.sendMetric(ctx, metric); err != nil && !errors.Is(err, context.Canceled) {
 				e.log.Errorf("writing metric to http server: %v", err)
 			}
 		}

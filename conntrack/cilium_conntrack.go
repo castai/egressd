@@ -13,12 +13,8 @@ type ciliumClient struct {
 	maps []interface{}
 }
 
-func (c *ciliumClient) ListEntries(filter EntriesFilter) ([]Entry, error) {
-	records, err := listRecords(c.maps, filter)
-	if err != nil {
-		return nil, err
-	}
-	return records, nil
+func (c *ciliumClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
+	return listRecords(c.maps, filter)
 }
 
 func (c *ciliumClient) Close() error {

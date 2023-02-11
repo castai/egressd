@@ -18,4 +18,9 @@ type PodNetworkMetric struct {
 	RxPackets    uint64 `json:"rx_packets"`
 	Proto        string `json:"proto"`
 	TS           uint64 `json:"ts"`
+
+	// lifetime is used to remove old pod metrics.
+	// This will happen if there are no more conntrack entries
+	// updating this metric.
+	lifetime uint32
 }

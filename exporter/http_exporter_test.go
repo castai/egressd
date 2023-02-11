@@ -20,7 +20,7 @@ func TestHTTPExporter(t *testing.T) {
 	log.SetLevel(logrus.DebugLevel)
 
 	metrics := &metricsGetter{
-		ch: make(chan collector.PodNetworkMetric, 10),
+		ch: make(chan *collector.PodNetworkMetric, 10),
 	}
 
 	receivedMetrics := make(chan collector.PodNetworkMetric)
@@ -42,7 +42,7 @@ func TestHTTPExporter(t *testing.T) {
 		}
 	}()
 
-	testMetric := collector.PodNetworkMetric{
+	testMetric := &collector.PodNetworkMetric{
 		SrcIP:        "1",
 		SrcPod:       "2",
 		SrcNamespace: "3",
@@ -66,7 +66,7 @@ func TestHTTPExporter(t *testing.T) {
 	timeout := time.After(3 * time.Second)
 	select {
 	case m := <-receivedMetrics:
-		r.Equal(testMetric, m)
+		r.Equal(*testMetric, m)
 	case err := <-startErr:
 		t.Fatal(err)
 	case <-timeout:
@@ -75,9 +75,9 @@ func TestHTTPExporter(t *testing.T) {
 }
 
 type metricsGetter struct {
-	ch chan collector.PodNetworkMetric
+	ch chan *collector.PodNetworkMetric
 }
 
-func (m *metricsGetter) GetMetricsChan() <-chan collector.PodNetworkMetric {
+func (m *metricsGetter) GetMetricsChan() <-chan *collector.PodNetworkMetric {
 	return m.ch
 }
