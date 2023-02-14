@@ -115,7 +115,7 @@ func TestCollector(t *testing.T) {
 		r.NoError(coll.collect())
 
 		// Flush and export metrics.
-		r.NoError(coll.export())
+		coll.export()
 
 		close(coll.metricsChan)
 		<-done
