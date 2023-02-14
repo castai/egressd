@@ -105,9 +105,7 @@ func (c *Collector) Start(ctx context.Context) error {
 				c.log.Errorf("collecting: %v", err)
 			}
 		case <-exportTicker.C:
-			if err := c.export(); err != nil {
-				c.log.Errorf("exporting: %v", err)
-			}
+			c.export()
 		case <-cleanupTicker.C:
 			c.cleanup()
 		}
@@ -228,7 +226,7 @@ func (c *Collector) initNewPodNetworkMetric(conn *conntrack.Entry) (*PodNetworkM
 	return &metric, nil
 }
 
-func (c *Collector) export() error {
+func (c *Collector) export() {
 	start := time.Now()
 	ts := uint64(c.currentTimeGetter().UTC().UnixMilli())
 
@@ -246,7 +244,6 @@ func (c *Collector) export() error {
 	}
 
 	c.log.Debugf("flushed in %s, metrics=%d", time.Since(start), metricsCount)
-	return nil
 }
 
 func (c *Collector) cleanup() {
