@@ -48,7 +48,7 @@ func (e *HTTPExporter) Start(ctx context.Context) error {
 			return ctx.Err()
 		case metric := <-e.metrics.GetMetricsChan():
 			metrics.IncExportedEvents()
-			if err := e.sendMetric(ctx, &metric); err != nil && !errors.Is(err, context.Canceled) {
+			if err := e.sendMetric(ctx, metric); err != nil && !errors.Is(err, context.Canceled) {
 				e.log.Errorf("writing metric to http server: %v", err)
 			}
 		}
@@ -56,11 +56,11 @@ func (e *HTTPExporter) Start(ctx context.Context) error {
 }
 
 func (e *HTTPExporter) sendMetric(ctx context.Context, m *collector.PodNetworkMetric) error {
-	jsonBytes, err := jsoniter.ConfigFastest.Marshal(m)
-	if err != nil {
+	var buf bytes.Buffer
+	if err := jsoniter.ConfigFastest.NewEncoder(&buf).Encode(m); err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, "POST", e.cfg.Addr, bytes.NewBuffer(jsonBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", e.cfg.Addr, &buf)
 	if err != nil {
 		return err
 	}

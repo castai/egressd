@@ -7,7 +7,7 @@ import (
 )
 
 type metricsChanGetter interface {
-	GetMetricsChan() <-chan collector.PodNetworkMetric
+	GetMetricsChan() <-chan *collector.PodNetworkMetric
 }
 
 type Exporter interface {

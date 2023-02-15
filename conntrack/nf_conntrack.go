@@ -45,7 +45,7 @@ type netfilterClient struct {
 	nfctDumper nfctDumper
 }
 
-func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]Entry, error) {
+func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 	sessions, err := n.nfctDumper.Dump(ct.Conntrack, ct.IPv4)
 	if err != nil {
 		return nil, fmt.Errorf("dumping nfct sessions: %w", err)
@@ -53,7 +53,7 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]Entry, error) {
 
 	metrics.SetConntrackEntriesCount(float64(len(sessions)))
 
-	res := make([]Entry, 0)
+	res := make([]*Entry, 0)
 	var skippedEntriesCount int
 	for _, sess := range sessions {
 		if sess.Origin == nil || sess.Origin.Src == nil || sess.Origin.Proto == nil || sess.Origin.Proto.SrcPort == nil || sess.Origin.Proto.DstPort == nil ||
@@ -67,7 +67,8 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]Entry, error) {
 		originCounter := sess.CounterOrigin
 		reply := sess.Reply
 		replyCounter := sess.CounterReply
-		entry := Entry{
+
+		entry := &Entry{
 			Src:       netaddr.IPPortFrom(ipFromStdIP(*origin.Src), *origin.Proto.SrcPort),
 			Dst:       netaddr.IPPortFrom(ipFromStdIP(*origin.Dst), *origin.Proto.DstPort),
 			TxBytes:   *originCounter.Bytes,
@@ -76,14 +77,33 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]Entry, error) {
 			RxPackets: *replyCounter.Packets,
 			Proto:     *origin.Proto.Number,
 		}
+		if sess.Timeout != nil {
+			entry.Lifetime = *sess.Timeout
+		}
 		replySrc := netaddr.IPPortFrom(ipFromStdIP(*reply.Src), *reply.Proto.SrcPort)
 		// Probably ClusterIP service, remap destination to actual pod IP.
 		if entry.Dst != replySrc {
 			entry.Dst = replySrc
 		}
-		if filter(&entry) {
+		if filter(entry) {
 			res = append(res, entry)
 		}
+
+		// Cilium stores two records for single flow.
+		entry2 := &Entry{
+			Src:       entry.Dst,
+			Dst:       entry.Src,
+			TxBytes:   entry.RxBytes,
+			TxPackets: entry.RxPackets,
+			RxBytes:   entry.TxBytes,
+			RxPackets: entry.RxPackets,
+			Proto:     entry.Proto,
+			Lifetime:  entry.Lifetime,
+		}
+		if filter(entry2) {
+			res = append(res, entry2)
+		}
+
 	}
 	if skippedEntriesCount > 0 {
 		n.log.Warnf("skipped %d conntrack entries", skippedEntriesCount)

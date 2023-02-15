@@ -29,6 +29,7 @@ var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
 	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
 	flushInterval     = flag.Duration("flush-interval", 60*time.Second, "Interval of time for flushing pod network cache")
+	cleanupInterval   = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportMode        = flag.String("export-mode", "http", "Export mode. Available values: http,file")
 	exportHTTPAddr    = flag.String("export-http-addr", "http://egressd-aggregator:6000", "Export to vector aggregator http source")
@@ -101,9 +102,9 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 	cfg := collector.Config{
 		ReadInterval:      *readInterval,
 		FlushInterval:     *flushInterval,
+		CleanupInterval:   *cleanupInterval,
 		NodeName:          os.Getenv("NODE_NAME"),
 		ExcludeNamespaces: *excludeNamespaces,
-		CacheItems:        20000,
 		MetricBufferSize:  *metricBufferSize,
 	}
 	coll := collector.New(cfg, log, kubeWatcher, conntracker, collector.CurrentTimeGetter())

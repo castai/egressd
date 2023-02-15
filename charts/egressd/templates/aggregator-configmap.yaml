@@ -19,10 +19,35 @@ data:
         address: 0.0.0.0:6000
         type: vector
         version: "2"
-      http_server:
+      egressd_http:
         type: "http_server"
         address: "0.0.0.0:8080"
-        encoding: "json"
+        encoding: "text"
+
+    transforms:
+      egressd_logs:
+        type: remap
+        inputs:
+          - egressd_http
+        source: |-
+          . = parse_json!(string!(.message))
+
+      reduced_egressd_logs:
+        type: reduce
+        inputs:
+          - egressd_logs
+        group_by:
+          - src_ip
+          - dst_ip
+          - proto
+        merge_strategies:
+          tx_bytes: retain
+          tx_packets: retain
+          rx_bytes: retain
+          rx_packets: retain
+          ts: retain
+        expire_after_ms: 5000
+
     sinks:
       prom_exporter:
         type: prometheus_exporter
@@ -32,7 +57,7 @@ data:
       castai:
         type: http
         inputs:
-          - http_server
+          - reduced_egressd_logs
         uri: "{{.Values.castai.apiURL}}/v1/security/egress/{{.Values.castai.clusterID}}"
         compression: gzip
         encoding:
@@ -49,7 +74,7 @@ data:
       stdout:
         type: console
         inputs:
-          - http_server
+          - reduced_egressd_logs
         encoding:
           codec: json
     {{- end }}

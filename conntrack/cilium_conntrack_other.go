@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-func listRecords(maps []interface{}, filter EntriesFilter) ([]Entry, error) {
+func listRecords(maps []interface{}, filter EntriesFilter) ([]*Entry, error) {
 	return nil, errors.New("not implemented")
 }
 
