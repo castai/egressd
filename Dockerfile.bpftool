@@ -1,0 +1,27 @@
+# Build image: docker build -f Dockerfile.bpftool -t ghcr.io/castai/egressd/bpftool .
+# Push image: docker push ghcr.io/castai/egressd/bpftool:latest
+
+FROM ubuntu:22.04 as builder
+RUN \
+	export DEBIAN_FRONTEND=noninteractive && \
+	apt-get update && \
+	apt-get -y install --no-install-recommends \
+        git \
+        ca-certificates \
+		build-essential \
+		libelf-dev \
+		libz-dev \
+		libcap-dev \
+		clang llvm llvm-dev lld \
+		binutils-dev \
+		pkg-config && \
+	rm -rf /var/lib/apt/lists/*
+
+RUN cd tmp && git clone --recurse-submodules https://github.com/libbpf/bpftool.git
+RUN \
+	make -C /tmp/bpftool/src clean && \
+	EXTRA_CFLAGS=--static make -C /tmp/bpftool/src -j "$(nproc)"
+
+FROM gcr.io/distroless/static-debian11
+COPY --from=builder /tmp/bpftool/src/bpftool /bin/bpftool
+
