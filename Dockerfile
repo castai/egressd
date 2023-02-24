@@ -1,5 +1,5 @@
 # Cilium uses bpftool to find supported ebpf maps features. Our bpftool image is statically linked.
-ARG BPFTOOL_IMAGE=ghcr.io/castai/egressd/bpftool@sha256:a4cb5507957aa97aabd77005f57818def8d61d5125445dad0014799b63241643
+ARG BPFTOOL_IMAGE=ghcr.io/castai/egressd/bpftool@sha256:93f06b391f8e821cef06294bb70228313e11aeac181979109a4fe1a8a3379f7a
 FROM ${BPFTOOL_IMAGE} as bpftool-dist
 
 FROM gcr.io/distroless/static-debian11
