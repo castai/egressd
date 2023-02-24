@@ -39,8 +39,8 @@ func NewWatcher(k8sClient kubernetes.Interface) Watcher {
 		panic(err)
 	}
 	err := podInformer.AddIndexers(map[string]cache.IndexFunc{
-		podIPIdx:   podIPIndexerFunc,
-		podNodeIdx: podNodeIndexerFunc,
+		podIPIdx:   runningPodIPIndexerFunc,
+		podNodeIdx: runningPodNodeIndexerFunc,
 	})
 	if err != nil {
 		panic(err)
@@ -128,7 +128,7 @@ func (k *kubernetesWatcher) GetNodeByIP(ip string) (*corev1.Node, error) {
 	return node.(*corev1.Node), nil
 }
 
-func podNodeIndexerFunc(obj interface{}) ([]string, error) {
+func runningPodNodeIndexerFunc(obj interface{}) ([]string, error) {
 	switch t := obj.(type) {
 	case *corev1.Pod:
 		if t.Status.Phase == corev1.PodRunning {
@@ -139,7 +139,7 @@ func podNodeIndexerFunc(obj interface{}) ([]string, error) {
 	return nil, fmt.Errorf("expected pod, got unknown type %T", obj)
 }
 
-func podIPIndexerFunc(obj interface{}) ([]string, error) {
+func runningPodIPIndexerFunc(obj interface{}) ([]string, error) {
 	switch t := obj.(type) {
 	case *corev1.Pod:
 		if t.Status.Phase == corev1.PodRunning {
