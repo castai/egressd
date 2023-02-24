@@ -131,7 +131,10 @@ func (k *kubernetesWatcher) GetNodeByIP(ip string) (*corev1.Node, error) {
 func podNodeIndexerFunc(obj interface{}) ([]string, error) {
 	switch t := obj.(type) {
 	case *corev1.Pod:
-		return []string{t.Spec.NodeName}, nil
+		if t.Status.Phase == corev1.PodRunning {
+			return []string{t.Spec.NodeName}, nil
+		}
+		return []string{}, nil
 	}
 	return nil, fmt.Errorf("expected pod, got unknown type %T", obj)
 }
@@ -139,7 +142,10 @@ func podNodeIndexerFunc(obj interface{}) ([]string, error) {
 func podIPIndexerFunc(obj interface{}) ([]string, error) {
 	switch t := obj.(type) {
 	case *corev1.Pod:
-		return []string{t.Status.PodIP}, nil
+		if t.Status.Phase == corev1.PodRunning {
+			return []string{t.Status.PodIP}, nil
+		}
+		return []string{}, nil
 	}
 	return nil, fmt.Errorf("expected pod, got unknown type %T", obj)
 }
@@ -176,6 +182,7 @@ func transformFunc(obj interface{}) (interface{}, error) {
 		}
 		t.Status = corev1.PodStatus{
 			PodIP: t.Status.PodIP,
+			Phase: t.Status.Phase,
 		}
 		t.SetLabels(nil)
 		t.SetAnnotations(nil)
@@ -183,7 +190,9 @@ func transformFunc(obj interface{}) (interface{}, error) {
 	case *corev1.Node:
 		t.SetManagedFields(nil)
 		t.Spec = corev1.NodeSpec{}
-		t.Status = corev1.NodeStatus{}
+		t.Status = corev1.NodeStatus{
+			Addresses: t.Status.Addresses,
+		}
 		return t, nil
 	}
 	return nil, fmt.Errorf("unknown type %T", obj)
