@@ -1,0 +1,40 @@
+alertmanager:
+  enabled: false
+
+ruler:
+  enabled: false
+
+distributor:
+  replicas: 1
+
+ingester:
+  replicas: 1
+  persistentVolume:
+    enabled: true
+    size: 10Gi
+  statefulSet:
+    enabled: true
+
+nginx:
+  replicas: 1
+
+store_gateway:
+  replicas: 1
+
+compactor:
+  replicas: 1
+
+query_scheduler:
+  enabled: false
+
+config:
+  ingester:
+    lifecycler:
+      ring:
+        replication_factor: 1
+        kvstore:
+          store: "memberlist"
+  blocks_storage:
+    backend: "filesystem"
+    filesystem:
+      dir: "/data/tsdb"
