@@ -146,7 +146,9 @@ func (c *Collector) collect() error {
 			pm.TxPackets += txPackets
 			pm.RxBytes += rxBytes
 			pm.RxPackets += rxPackets
-			pm.lifetime = conn.Lifetime
+			if conn.Lifetime > pm.lifetime {
+				pm.lifetime = conn.Lifetime
+			}
 		} else {
 			pm, err := c.initNewPodNetworkMetric(conn)
 			if err != nil {

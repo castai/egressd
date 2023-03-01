@@ -183,6 +183,39 @@ func TestCollector(t *testing.T) {
 		r.Equal(1, int(metric.TxPackets))
 	})
 
+	t.Run("update metric with latest conntrack lifetime", func(t *testing.T) {
+		r := require.New(t)
+
+		connTracker := &mockConntrack{
+			entries: []conntrack.Entry{
+				{
+					Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+					Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+					TxBytes:   10,
+					TxPackets: 1,
+					Proto:     6,
+					Lifetime:  5, // This lifetime should be used.
+				},
+				{
+					Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+					Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+					TxBytes:   10,
+					TxPackets: 1,
+					Proto:     6,
+					Lifetime:  1,
+				},
+			},
+		}
+
+		coll := newCollector(connTracker)
+
+		r.NoError(coll.collect())
+		r.NoError(coll.collect())
+		r.Len(coll.podMetrics, 1)
+		metric := lo.Values(coll.podMetrics)[0]
+		r.Equal(5, int(metric.lifetime))
+	})
+
 	t.Run("cleanup expired", func(t *testing.T) {
 		r := require.New(t)
 
