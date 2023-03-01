@@ -78,30 +78,12 @@ export:
     # By default export is set to vector aggregator service.
     # addr: http://castai-egressd-aggregator:80
     addr: ""
-  file:
-    image: timberio/vector:0.25.1-alpine
-    resources: {}
-    securityContext: {}
-    vectorConfig: |
-      sources:
-        logs:
-          type: file
-          ignore_older_secs: 600
-          include:
-            - /var/run/egressd/egressd.log
-          read_from: end
-      sinks:
-        vector_aggregator:
-          type: vector
-          inputs:
-            - logs
-          address: {{ include "egressd.export.file.addr" . }}
 
 aggregator:
   enabled: true
-  createConfigmap: true
+  createConfigmap: true # If enabled, default vector aggregator config is used.
   logToStdout: false
-  debug: false
+  debug: false # Enable vector aggregator debug logs.
   image: "timberio/vector:0.28.0-distroless-libc"
   castaiSink:
     maxBytes: "10485760" # 10MB on not compressed logs. Final logs will be compressed.

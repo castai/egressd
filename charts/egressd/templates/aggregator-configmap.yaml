@@ -42,13 +42,13 @@ data:
         compression: gzip
         encoding:
           codec: json
+        batch:
+          max_bytes: {{ .Values.aggregator.castaiSink.maxBytes }}
+          timeout_secs: {{ .Values.aggregator.castaiSink.timeoutSecs }}
         method: post
         request:
           headers:
             X-API-Key: "${CASTAI_API_KEY}"
-        batch:
-          max_bytes: {{ .Values.aggregator.castaiSink.maxBytes }}
-          timeout_secs: {{ .Values.aggregator.castaiSink.timeoutSecs }}
     {{- end }}
 
     {{- if .Values.aggregator.logToStdout}}

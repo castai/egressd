@@ -67,29 +67,6 @@ spec:
             - mountPath: /hostproc/sys/net/netfilter
               name: netfilter
               mountPropagation: Bidirectional
-      {{- if and (.Values.export.enabled) (eq .Values.export.mode "file") }}
-        - name: egressd-export
-          image: {{.Values.export.image}}
-          imagePullPolicy: IfNotPresent
-          command:
-            - vector
-          args:
-            - --config
-            - /vector/vector-config.yaml
-          resources:
-            {{- toYaml .Values.export.resources | nindent 12 }}
-          securityContext:
-            {{- toYaml .Values.export.securityContext | nindent 12 }}
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-          volumeMounts:
-            - mountPath: /var/run/egressd
-              name: export-logs
-              readOnly: true
-            - mountPath: /vector
-              name: egressd-vector-config
-              readOnly: true
-      {{- end }}
       dnsPolicy: {{.Values.dnsPolicy}}
       volumes:
         - name: netfilter
@@ -103,15 +80,6 @@ spec:
           hostPath:
             path: /var/run/egressd
             type: DirectoryOrCreate
-      {{- if and (.Values.export.enabled) (eq .Values.export.mode "file") }}
-        - name: egressd-vector-config
-          configMap:
-            defaultMode: 420
-            items:
-              - key: vector-config.yaml
-                path: vector-config.yaml
-            name: {{ include "egressd.fullname" . }}
-      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

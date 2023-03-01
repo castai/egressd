@@ -75,9 +75,6 @@ spec:
             - name: prom-exporter
               containerPort: 9090
               protocol: TCP
-            - name: vector
-              containerPort: 6000
-              protocol: TCP
             - name: http-server
               containerPort: 8080
               protocol: TCP
