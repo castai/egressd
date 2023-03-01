@@ -68,6 +68,9 @@ dnsPolicy: ClusterFirstWithHostNet
 extraArgs:
   # metric-buffer-size: 10000
 
+prometheusScrape:
+  enabled: true
+
 export:
   enabled: true
   mode: "http"
@@ -96,7 +99,10 @@ export:
 
 aggregator:
   enabled: true
+  createConfigmap: true
   logToStdout: false
+  debug: false
+  image: "timberio/vector:0.28.0-distroless-libc"
   castaiSink:
     maxBytes: "10485760" # 10MB on not compressed logs. Final logs will be compressed.
     timeoutSecs: "10" # Send logs after this period or maxBytes.
