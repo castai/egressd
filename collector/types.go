@@ -19,8 +19,8 @@ type PodNetworkMetric struct {
 	Proto        string `json:"proto"`
 	TS           uint64 `json:"ts,omitempty"`
 
-	// lifetime is used to remove old pod metrics.
+	// lifetimeUnixSeconds is used to remove old pod metrics.
 	// This will happen if there are no more conntrack entries
 	// updating this metric.
-	lifetime uint32
+	lifetimeUnixSeconds uint32
 }

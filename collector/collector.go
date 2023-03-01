@@ -146,13 +146,14 @@ func (c *Collector) collect() error {
 			pm.TxPackets += txPackets
 			pm.RxBytes += rxBytes
 			pm.RxPackets += rxPackets
-			if conn.Lifetime > pm.lifetime {
-				pm.lifetime = conn.Lifetime
+			if conn.LifetimeUnixSeconds > pm.lifetimeUnixSeconds {
+				pm.lifetimeUnixSeconds = conn.LifetimeUnixSeconds
 			}
 		} else {
 			pm, err := c.initNewPodNetworkMetric(conn)
 			if err != nil {
-				return fmt.Errorf("initializing new pod network metric: %w", err)
+				c.log.Warnf("initializing new pod network metric: %v", err)
+				continue
 			}
 			c.podMetrics[groupKey] = pm
 		}
@@ -170,18 +171,18 @@ func (c *Collector) initNewPodNetworkMetric(conn *conntrack.Entry) (*PodNetworkM
 	}
 	dstIPString := conn.Dst.IP().String()
 	metric := PodNetworkMetric{
-		SrcIP:        conn.Src.IP().String(),
-		SrcPod:       pod.Name,
-		SrcNamespace: pod.Namespace,
-		SrcNode:      pod.Spec.NodeName,
-		DstIP:        dstIPString,
-		DstIPType:    ipType(conn.Dst.IP()),
-		TxBytes:      conn.TxBytes,
-		TxPackets:    conn.TxPackets,
-		RxBytes:      conn.RxBytes,
-		RxPackets:    conn.RxPackets,
-		Proto:        conntrack.ProtoString(conn.Proto),
-		lifetime:     conn.Lifetime,
+		SrcIP:               conn.Src.IP().String(),
+		SrcPod:              pod.Name,
+		SrcNamespace:        pod.Namespace,
+		SrcNode:             pod.Spec.NodeName,
+		DstIP:               dstIPString,
+		DstIPType:           ipType(conn.Dst.IP()),
+		TxBytes:             conn.TxBytes,
+		TxPackets:           conn.TxPackets,
+		RxBytes:             conn.RxBytes,
+		RxPackets:           conn.RxPackets,
+		Proto:               conntrack.ProtoString(conn.Proto),
+		lifetimeUnixSeconds: conn.LifetimeUnixSeconds,
 	}
 
 	srcNode, err := c.kubeWatcher.GetNodeByName(pod.Spec.NodeName)
@@ -245,30 +246,30 @@ func (c *Collector) export() {
 		}
 	}
 
-	c.log.Debugf("flushed in %s, metrics=%d", time.Since(start), metricsCount)
+	c.log.Infof("flushed in %s, metrics=%d", time.Since(start), metricsCount)
 }
 
 func (c *Collector) cleanup() {
 	start := time.Now()
-	nowUnixSeconds := uint32(time.Now().Unix())
+	nowUnixSeconds := getUnixNowSeconds(c.currentTimeGetter)
 	deletedEntriesCount := 0
 	deletedPodMetricsCount := 0
 
 	for key, e := range c.entriesCache {
-		if e.Lifetime < nowUnixSeconds {
+		if e.LifetimeUnixSeconds < nowUnixSeconds {
 			delete(c.entriesCache, key)
 			deletedEntriesCount++
 		}
 	}
 
 	for key, m := range c.podMetrics {
-		if m.lifetime < nowUnixSeconds {
+		if m.lifetimeUnixSeconds < nowUnixSeconds {
 			delete(c.podMetrics, key)
 			deletedPodMetricsCount++
 		}
 	}
 
-	c.log.Debugf("cleanup done in %s, deleted_conntrack=%d, deleted_pod_metrics=%d", time.Since(start), deletedEntriesCount, deletedPodMetricsCount)
+	c.log.Infof("cleanup done in %s, deleted_conntrack=%d, deleted_pod_metrics=%d", time.Since(start), deletedEntriesCount, deletedPodMetricsCount)
 }
 
 func (c *Collector) getNodePods() ([]*corev1.Pod, error) {
@@ -347,4 +348,8 @@ func ipType(ip netaddr.IP) string {
 		return "private"
 	}
 	return "public"
+}
+
+func getUnixNowSeconds(now func() time.Time) uint32 {
+	return uint32(now().Unix())
 }
