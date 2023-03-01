@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	ct "github.com/florianl/go-conntrack"
 	"github.com/sirupsen/logrus"
@@ -53,6 +54,8 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 
 	metrics.SetConntrackEntriesCount(float64(len(sessions)))
 
+	nowUnixSeconds := uint32(time.Now().Unix())
+
 	res := make([]*Entry, 0)
 	var skippedEntriesCount int
 	for _, sess := range sessions {
@@ -78,7 +81,7 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 			Proto:     *origin.Proto.Number,
 		}
 		if sess.Timeout != nil {
-			entry.Lifetime = *sess.Timeout
+			entry.LifetimeUnixSeconds = nowUnixSeconds + *sess.Timeout
 		}
 		replySrc := netaddr.IPPortFrom(ipFromStdIP(*reply.Src), *reply.Proto.SrcPort)
 		// Probably ClusterIP service, remap destination to actual pod IP.
@@ -91,14 +94,14 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 
 		// Cilium stores two records for single flow.
 		entry2 := &Entry{
-			Src:       entry.Dst,
-			Dst:       entry.Src,
-			TxBytes:   entry.RxBytes,
-			TxPackets: entry.RxPackets,
-			RxBytes:   entry.TxBytes,
-			RxPackets: entry.RxPackets,
-			Proto:     entry.Proto,
-			Lifetime:  entry.Lifetime,
+			Src:                 entry.Dst,
+			Dst:                 entry.Src,
+			TxBytes:             entry.RxBytes,
+			TxPackets:           entry.RxPackets,
+			RxBytes:             entry.TxBytes,
+			RxPackets:           entry.RxPackets,
+			Proto:               entry.Proto,
+			LifetimeUnixSeconds: entry.LifetimeUnixSeconds,
 		}
 		if filter(entry2) {
 			res = append(res, entry2)
@@ -106,7 +109,7 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 
 	}
 	if skippedEntriesCount > 0 {
-		n.log.Warnf("skipped %d conntrack entries", skippedEntriesCount)
+		n.log.Debugf("skipped %d conntrack entries", skippedEntriesCount)
 	}
 	return res, nil
 }

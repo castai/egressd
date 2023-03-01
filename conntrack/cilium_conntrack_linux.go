@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/castai/egressd/metrics"
 
@@ -29,6 +30,8 @@ func bpfMapsExist() bool {
 
 func listRecords(maps []interface{}, filter EntriesFilter) ([]*Entry, error) {
 	entries := make([]*Entry, 0)
+
+	nowUnixSeconds := uint32(time.Now().Unix())
 
 	var fetchedCount int
 	for _, m := range maps {
@@ -54,14 +57,14 @@ func listRecords(maps []interface{}, filter EntriesFilter) ([]*Entry, error) {
 			dstIP := k.SourceAddr.IP()
 			val := v.(*ctmap.CtEntry)
 			record := &Entry{
-				Src:       netaddr.IPPortFrom(netaddr.IPv4(srcIP[0], srcIP[1], srcIP[2], srcIP[3]), k.SourcePort),
-				Dst:       netaddr.IPPortFrom(netaddr.IPv4(dstIP[0], dstIP[1], dstIP[2], dstIP[3]), k.DestPort),
-				TxBytes:   val.TxBytes,
-				TxPackets: val.TxPackets,
-				RxBytes:   val.RxBytes,
-				RxPackets: val.RxPackets,
-				Lifetime:  val.Lifetime,
-				Proto:     uint8(k.NextHeader),
+				Src:                 netaddr.IPPortFrom(netaddr.IPv4(srcIP[0], srcIP[1], srcIP[2], srcIP[3]), k.SourcePort),
+				Dst:                 netaddr.IPPortFrom(netaddr.IPv4(dstIP[0], dstIP[1], dstIP[2], dstIP[3]), k.DestPort),
+				TxBytes:             val.TxBytes,
+				TxPackets:           val.TxPackets,
+				RxBytes:             val.RxBytes,
+				RxPackets:           val.RxPackets,
+				LifetimeUnixSeconds: nowUnixSeconds, // TODO: See bpf_ct_list.go for how to calculate actual expiration seconds. CtEntry only gives Lifetime field which need adjustments for clock source.
+				Proto:               uint8(k.NextHeader),
 			}
 			if filter(record) {
 				entries = append(entries, record)

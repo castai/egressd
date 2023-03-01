@@ -7,14 +7,14 @@ import (
 )
 
 type Entry struct {
-	Src       netaddr.IPPort
-	Dst       netaddr.IPPort
-	TxBytes   uint64
-	TxPackets uint64
-	RxBytes   uint64
-	RxPackets uint64
-	Lifetime  uint32
-	Proto     uint8
+	Src                 netaddr.IPPort
+	Dst                 netaddr.IPPort
+	TxBytes             uint64
+	TxPackets           uint64
+	RxBytes             uint64
+	RxPackets           uint64
+	LifetimeUnixSeconds uint32
+	Proto               uint8
 }
 
 type EntriesFilter func(e *Entry) bool

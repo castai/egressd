@@ -27,9 +27,10 @@ import (
 
 var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
+	logLevel          = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
 	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
 	flushInterval     = flag.Duration("flush-interval", 60*time.Second, "Interval of time for flushing pod network cache")
-	cleanupInterval   = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
+	cleanupInterval   = flag.Duration("cleanup-interval", 123*time.Second, "Interval of time for cleanup cached conntrack entries")
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportMode        = flag.String("export-mode", "http", "Export mode. Available values: http,file")
 	exportHTTPAddr    = flag.String("export-http-addr", "http://egressd-aggregator:6000", "Export to vector aggregator http source")
@@ -49,7 +50,11 @@ func main() {
 	flag.Parse()
 
 	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
+	lvl, err := logrus.ParseLevel(*logLevel)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetLevel(lvl)
 
 	ctx, shutdown := context.WithCancel(context.Background())
 	defer shutdown()
