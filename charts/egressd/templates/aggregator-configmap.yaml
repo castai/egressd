@@ -1,4 +1,4 @@
-{{- if .Values.aggregator.enabled }}
+{{- if and .Values.aggregator.enabled .Values.aggregator.createConfigmap }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -15,10 +15,6 @@ data:
     sources:
       internal_metrics:
         type: internal_metrics
-      vector:
-        address: 0.0.0.0:6000
-        type: vector
-        version: "2"
       egressd_http:
         type: "http_server"
         address: "0.0.0.0:8080"
@@ -32,22 +28,6 @@ data:
         source: |-
           . = parse_json!(string!(.message))
 
-      reduced_egressd_logs:
-        type: reduce
-        inputs:
-          - egressd_logs
-        group_by:
-          - src_ip
-          - dst_ip
-          - proto
-        merge_strategies:
-          tx_bytes: retain
-          tx_packets: retain
-          rx_bytes: retain
-          rx_packets: retain
-          ts: retain
-        expire_after_ms: 5000
-
     sinks:
       prom_exporter:
         type: prometheus_exporter
@@ -57,7 +37,7 @@ data:
       castai:
         type: http
         inputs:
-          - reduced_egressd_logs
+          - egressd_logs
         uri: "{{.Values.castai.apiURL}}/v1/security/egress/{{.Values.castai.clusterID}}"
         compression: gzip
         encoding:
@@ -65,6 +45,7 @@ data:
         batch:
           max_bytes: {{ .Values.aggregator.castaiSink.maxBytes }}
           timeout_secs: {{ .Values.aggregator.castaiSink.timeoutSecs }}
+        method: post
         request:
           headers:
             X-API-Key: "${CASTAI_API_KEY}"
@@ -74,7 +55,7 @@ data:
       stdout:
         type: console
         inputs:
-          - reduced_egressd_logs
+          - egressd_logs
         encoding:
           codec: json
     {{- end }}

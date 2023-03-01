@@ -52,12 +52,16 @@ spec:
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "timberio/vector:0.27.0-distroless-libc"
+          image: {{ .Values.aggregator.image }}
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir
             - /etc/vector/
           env:
+          {{- if.Values.aggregator.debug }}
+            - name: VECTOR_LOG
+              value: "debug"
+          {{- end}}
             - name: CASTAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -70,9 +74,6 @@ spec:
               protocol: TCP
             - name: prom-exporter
               containerPort: 9090
-              protocol: TCP
-            - name: vector
-              containerPort: 6000
               protocol: TCP
             - name: http-server
               containerPort: 8080
