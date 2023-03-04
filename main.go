@@ -104,6 +104,10 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 	if err != nil {
 		return err
 	}
+	dnsStore, err := collector.NewEBPFDNSStore(ctx, log)
+	if err != nil {
+		return err
+	}
 	cfg := collector.Config{
 		ReadInterval:      *readInterval,
 		FlushInterval:     *flushInterval,
@@ -112,7 +116,14 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 		ExcludeNamespaces: *excludeNamespaces,
 		MetricBufferSize:  *metricBufferSize,
 	}
-	coll := collector.New(cfg, log, kubeWatcher, conntracker, collector.CurrentTimeGetter())
+	coll := collector.New(
+		cfg,
+		log,
+		kubeWatcher,
+		conntracker,
+		collector.CurrentTimeGetter(),
+		dnsStore,
+	)
 
 	switch *exportMode {
 	case "http":

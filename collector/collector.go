@@ -44,6 +44,7 @@ func New(
 	kubeWatcher kube.Watcher,
 	conntracker conntrack.Client,
 	currentTimeGetter func() time.Time,
+	dnsStore DNSStore,
 ) *Collector {
 	excludeNsMap := map[string]struct{}{}
 	if cfg.ExcludeNamespaces != "" {
@@ -72,6 +73,7 @@ func New(
 		metricsChan:       make(chan *PodNetworkMetric, cfg.MetricBufferSize),
 		excludeNsMap:      excludeNsMap,
 		currentTimeGetter: currentTimeGetter,
+		dnsStore:          dnsStore,
 	}
 }
 
@@ -85,6 +87,7 @@ type Collector struct {
 	excludeNsMap      map[string]struct{}
 	metricsChan       chan *PodNetworkMetric
 	currentTimeGetter func() time.Time
+	dnsStore          DNSStore
 }
 
 func (c *Collector) GetMetricsChan() <-chan *PodNetworkMetric {

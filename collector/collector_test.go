@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"context"
 	"sort"
 	"strconv"
 	"testing"
@@ -48,6 +49,7 @@ func TestCollector(t *testing.T) {
 			kubeWatcher,
 			connTracker,
 			mockTimeGetter,
+			newMockDNSStore(),
 		)
 	}
 
@@ -289,6 +291,7 @@ func BenchmarkCollector(b *testing.B) {
 		kubeWatcher,
 		connTracker,
 		mockTimeGetter,
+		newMockDNSStore(),
 	)
 	expectedConns := podsCount * connsPerPod
 	expectedMetrics := podsCount * connsPerPod
@@ -374,4 +377,15 @@ func (m *mockKubeWatcher) GetPodsByNode(nodeName string) ([]*corev1.Pod, error) 
 		}
 	}
 	return res, nil
+}
+
+func newMockDNSStore() *mockDNSStore {
+	return &mockDNSStore{}
+}
+
+type mockDNSStore struct {
+}
+
+func (m *mockDNSStore) Run(ctx context.Context) error {
+	return nil
 }
