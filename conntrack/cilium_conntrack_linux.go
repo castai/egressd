@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/castai/egressd/metrics"
+	"golang.org/x/sys/unix"
 
 	"github.com/cilium/cilium/pkg/bpf"
 	"github.com/cilium/cilium/pkg/defaults"
@@ -31,7 +32,11 @@ func bpfMapsExist() bool {
 func listRecords(maps []interface{}, filter EntriesFilter) ([]*Entry, error) {
 	entries := make([]*Entry, 0)
 
-	nowUnixSeconds := uint32(time.Now().Unix())
+	now := time.Now().UTC()
+	nowMonoSeconds, err := getMonoTimeSeconds()
+	if err != nil {
+		return nil, err
+	}
 
 	var fetchedCount int
 	for _, m := range maps {
@@ -45,6 +50,7 @@ func listRecords(maps []interface{}, filter EntriesFilter) ([]*Entry, error) {
 				return nil, fmt.Errorf("unable to open map %s: %w", path, err)
 			}
 		}
+
 		defer m.Close()
 		cb := func(key bpf.MapKey, v bpf.MapValue) {
 			fetchedCount++
@@ -56,15 +62,16 @@ func listRecords(maps []interface{}, filter EntriesFilter) ([]*Entry, error) {
 			srcIP := k.DestAddr.IP() // Addresses are swapped due to cilium issue #21346.
 			dstIP := k.SourceAddr.IP()
 			val := v.(*ctmap.CtEntry)
+			expireSeconds := val.Lifetime - nowMonoSeconds
 			record := &Entry{
-				Src:                 netaddr.IPPortFrom(netaddr.IPv4(srcIP[0], srcIP[1], srcIP[2], srcIP[3]), k.SourcePort),
-				Dst:                 netaddr.IPPortFrom(netaddr.IPv4(dstIP[0], dstIP[1], dstIP[2], dstIP[3]), k.DestPort),
-				TxBytes:             val.TxBytes,
-				TxPackets:           val.TxPackets,
-				RxBytes:             val.RxBytes,
-				RxPackets:           val.RxPackets,
-				LifetimeUnixSeconds: nowUnixSeconds, // TODO: See bpf_ct_list.go for how to calculate actual expiration seconds. CtEntry only gives Lifetime field which need adjustments for clock source.
-				Proto:               uint8(k.NextHeader),
+				Src:       netaddr.IPPortFrom(netaddr.IPv4(srcIP[0], srcIP[1], srcIP[2], srcIP[3]), k.SourcePort),
+				Dst:       netaddr.IPPortFrom(netaddr.IPv4(dstIP[0], dstIP[1], dstIP[2], dstIP[3]), k.DestPort),
+				TxBytes:   val.TxBytes,
+				TxPackets: val.TxPackets,
+				RxBytes:   val.RxBytes,
+				RxPackets: val.RxPackets,
+				Lifetime:  now.Add(time.Duration(expireSeconds) * time.Second),
+				Proto:     uint8(k.NextHeader),
 			}
 			if filter(record) {
 				entries = append(entries, record)
@@ -86,4 +93,15 @@ func initMaps() []interface{} {
 		ctMaps[i] = m
 	}
 	return ctMaps
+}
+
+func getMonoTimeSeconds() (uint32, error) {
+	var ts unix.Timespec
+	err := unix.ClockGettime(unix.CLOCK_MONOTONIC, &ts)
+	if err != nil {
+		return 0, fmt.Errorf("getting monotonic clock time: %w", err)
+	}
+	ns := unix.TimespecToNsec(ts)
+	sec := ns / 1000000000
+	return uint32(sec), nil
 }

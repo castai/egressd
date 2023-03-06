@@ -29,7 +29,7 @@ var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
 	logLevel          = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
 	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
-	flushInterval     = flag.Duration("flush-interval", 60*time.Second, "Interval of time for flushing pod network cache")
+	flushInterval     = flag.Duration("flush-interval", 55*time.Second, "Interval of time for flushing pod network cache")
 	cleanupInterval   = flag.Duration("cleanup-interval", 123*time.Second, "Interval of time for cleanup cached conntrack entries")
 	httpAddr          = flag.String("http-addr", ":6060", "")
 	exportMode        = flag.String("export-mode", "http", "Export mode. Available values: http,file")
