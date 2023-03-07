@@ -37,6 +37,7 @@ var (
 	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
 	metricBufferSize  = flag.Int("metric-buffer-size", 10000, "Amount of entries that metrics buffer allows storing before blocking")
+	dumpCT            = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
 )
 
 // These should be set via `go build` during a release.
@@ -55,6 +56,13 @@ func main() {
 		log.Fatal(err)
 	}
 	log.SetLevel(lvl)
+
+	if *dumpCT {
+		if err := dumpConntrack(log); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	ctx, shutdown := context.WithCancel(context.Background())
 	defer shutdown()
@@ -173,4 +181,27 @@ func addPprofHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+}
+
+func dumpConntrack(log logrus.FieldLogger) error {
+	now := time.Now().UTC()
+	var err error
+	var conntracker conntrack.Client
+	ciliumAvailable := conntrack.CiliumAvailable()
+	if ciliumAvailable {
+		conntracker, err = conntrack.NewCiliumClient()
+	} else {
+		conntracker, err = conntrack.NewNetfilterClient(log)
+	}
+	if err != nil {
+		return err
+	}
+	entries, err := conntracker.ListEntries(conntrack.All())
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		fmt.Printf("proto=%d src=%s dst=%s tx_bytes=%d rx_bytes=%d expires=%v\n", e.Proto, e.Src, e.Dst, e.TxBytes, e.RxBytes, e.Lifetime.Sub(now))
+	}
+	return nil
 }
