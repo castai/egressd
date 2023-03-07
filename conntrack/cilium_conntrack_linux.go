@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/castai/egressd/metrics"
-	"golang.org/x/sys/unix"
-
 	"github.com/cilium/cilium/pkg/bpf"
 	"github.com/cilium/cilium/pkg/defaults"
 	"github.com/cilium/cilium/pkg/maps/ctmap"
@@ -29,13 +27,14 @@ func bpfMapsExist() bool {
 	return err == nil && file != nil
 }
 
-func listRecords(maps []interface{}, filter EntriesFilter) ([]*Entry, error) {
+func listRecords(maps []interface{}, clockSource ClockSource, filter EntriesFilter) ([]*Entry, error) {
 	entries := make([]*Entry, 0)
 
 	now := time.Now().UTC()
-	nowMonoSeconds, err := getMonoTimeSeconds()
+
+	timeDiff, err := kernelTimeDiffSecondsFunc(clockSource)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting kernel time diff func: %w", err)
 	}
 
 	var fetchedCount int
@@ -62,7 +61,7 @@ func listRecords(maps []interface{}, filter EntriesFilter) ([]*Entry, error) {
 			srcIP := k.DestAddr.IP() // Addresses are swapped due to cilium issue #21346.
 			dstIP := k.SourceAddr.IP()
 			val := v.(*ctmap.CtEntry)
-			expireSeconds := val.Lifetime - nowMonoSeconds
+			expireSeconds := timeDiff(int64(val.Lifetime))
 			record := &Entry{
 				Src:       netaddr.IPPortFrom(netaddr.IPv4(srcIP[0], srcIP[1], srcIP[2], srcIP[3]), k.SourcePort),
 				Dst:       netaddr.IPPortFrom(netaddr.IPv4(dstIP[0], dstIP[1], dstIP[2], dstIP[3]), k.DestPort),
@@ -93,15 +92,4 @@ func initMaps() []interface{} {
 		ctMaps[i] = m
 	}
 	return ctMaps
-}
-
-func getMonoTimeSeconds() (uint32, error) {
-	var ts unix.Timespec
-	err := unix.ClockGettime(unix.CLOCK_MONOTONIC, &ts)
-	if err != nil {
-		return 0, fmt.Errorf("getting monotonic clock time: %w", err)
-	}
-	ns := unix.TimespecToNsec(ts)
-	sec := ns / 1000000000
-	return uint32(sec), nil
 }

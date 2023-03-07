@@ -38,6 +38,7 @@ var (
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
 	metricBufferSize  = flag.Int("metric-buffer-size", 10000, "Amount of entries that metrics buffer allows storing before blocking")
 	dumpCT            = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
+	ciliumClockSource = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
 )
 
 // These should be set via `go build` during a release.
@@ -104,7 +105,7 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 
 	ciliumAvailable := conntrack.CiliumAvailable()
 	if ciliumAvailable {
-		conntracker, err = conntrack.NewCiliumClient()
+		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
 	} else {
 		conntracker, err = conntrack.NewNetfilterClient(log)
 	}
@@ -189,7 +190,7 @@ func dumpConntrack(log logrus.FieldLogger) error {
 	var conntracker conntrack.Client
 	ciliumAvailable := conntrack.CiliumAvailable()
 	if ciliumAvailable {
-		conntracker, err = conntrack.NewCiliumClient()
+		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
 	} else {
 		conntracker, err = conntrack.NewNetfilterClient(log)
 	}
