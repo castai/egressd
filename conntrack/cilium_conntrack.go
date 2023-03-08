@@ -1,8 +1,16 @@
 package conntrack
 
-func NewCiliumClient() (Client, error) {
+import (
+	"github.com/sirupsen/logrus"
+)
+
+func NewCiliumClient(log logrus.FieldLogger, clockSource ClockSource) (Client, error) {
 	maps := initMaps()
-	return &ciliumClient{maps: maps}, nil
+	return &ciliumClient{
+		log:         log,
+		maps:        maps,
+		clockSource: clockSource,
+	}, nil
 }
 
 func CiliumAvailable() bool {
@@ -10,11 +18,13 @@ func CiliumAvailable() bool {
 }
 
 type ciliumClient struct {
-	maps []interface{}
+	log         logrus.FieldLogger
+	maps        []interface{}
+	clockSource ClockSource
 }
 
 func (c *ciliumClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
-	return listRecords(c.maps, filter)
+	return listRecords(c.maps, c.clockSource, filter)
 }
 
 func (c *ciliumClient) Close() error {

@@ -87,4 +87,4 @@ aggregator:
   image: "timberio/vector:0.28.0-distroless-libc"
   castaiSink:
     maxBytes: "10485760" # 10MB on not compressed logs. Final logs will be compressed.
-    timeoutSecs: "10" # Send logs after this period or maxBytes.
+    timeoutSecs: "60" # Send logs after this period or maxBytes.

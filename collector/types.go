@@ -1,5 +1,7 @@
 package collector
 
+import "time"
+
 type PodNetworkMetric struct {
 	SrcIP        string `json:"src_ip"`
 	SrcPod       string `json:"src_pod,omitempty"`
@@ -19,8 +21,8 @@ type PodNetworkMetric struct {
 	Proto        string `json:"proto"`
 	TS           uint64 `json:"ts,omitempty"`
 
-	// lifetimeUnixSeconds is used to remove old pod metrics.
+	// lifetime is used to remove old pod metrics.
 	// This will happen if there are no more conntrack entries
 	// updating this metric.
-	lifetimeUnixSeconds uint32
+	lifetime time.Time
 }

@@ -186,23 +186,25 @@ func TestCollector(t *testing.T) {
 	t.Run("update metric with latest conntrack lifetimeUnixSeconds", func(t *testing.T) {
 		r := require.New(t)
 
+		now := mockTimeGetter()
+
 		connTracker := &mockConntrack{
 			entries: []conntrack.Entry{
 				{
-					Src:                 netaddr.MustParseIPPort("10.14.7.12:40001"),
-					Dst:                 netaddr.MustParseIPPort("10.14.7.5:3000"),
-					TxBytes:             10,
-					TxPackets:           1,
-					Proto:               6,
-					LifetimeUnixSeconds: 5, // This expiration should be used.
+					Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+					Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+					TxBytes:   10,
+					TxPackets: 1,
+					Proto:     6,
+					Lifetime:  now.Add(5 * time.Second), // This expiration should be used.
 				},
 				{
-					Src:                 netaddr.MustParseIPPort("10.14.7.12:40001"),
-					Dst:                 netaddr.MustParseIPPort("10.14.7.5:3000"),
-					TxBytes:             10,
-					TxPackets:           1,
-					Proto:               6,
-					LifetimeUnixSeconds: 1,
+					Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+					Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+					TxBytes:   10,
+					TxPackets: 1,
+					Proto:     6,
+					Lifetime:  now.Add(1 * time.Second),
 				},
 			},
 		}
@@ -213,20 +215,20 @@ func TestCollector(t *testing.T) {
 		r.NoError(coll.collect())
 		r.Len(coll.podMetrics, 1)
 		metric := lo.Values(coll.podMetrics)[0]
-		r.Equal(5, int(metric.lifetimeUnixSeconds))
+		r.Equal(now.Add(5*time.Second), metric.lifetime)
 	})
 
 	t.Run("cleanup expired", func(t *testing.T) {
 		r := require.New(t)
 
-		nowUnixSeconds := uint32(mockTimeGetter().Unix())
+		now := mockTimeGetter()
 
 		connTracker := &mockConntrack{}
 		coll := newCollector(connTracker)
-		coll.entriesCache[0] = &conntrack.Entry{LifetimeUnixSeconds: nowUnixSeconds + 10000}
-		coll.entriesCache[1] = &conntrack.Entry{LifetimeUnixSeconds: nowUnixSeconds - 100}
-		coll.podMetrics[0] = &PodNetworkMetric{lifetimeUnixSeconds: nowUnixSeconds + 10000}
-		coll.podMetrics[1] = &PodNetworkMetric{lifetimeUnixSeconds: nowUnixSeconds - 150}
+		coll.entriesCache[0] = &conntrack.Entry{Lifetime: now.Add(10000 * time.Second)}
+		coll.entriesCache[1] = &conntrack.Entry{Lifetime: now.Add(-100 * time.Second)}
+		coll.podMetrics[0] = &PodNetworkMetric{lifetime: now.Add(10000 * time.Second)}
+		coll.podMetrics[1] = &PodNetworkMetric{lifetime: now.Add(-150 * time.Second)}
 
 		coll.cleanup()
 		entries := lo.Values(coll.entriesCache)
@@ -264,14 +266,14 @@ func BenchmarkCollector(b *testing.B) {
 				c++
 			}
 			conns = append(conns, conntrack.Entry{
-				Src:                 netaddr.IPPortFrom(netaddr.MustParseIP(podIP), uint16(i)),
-				Dst:                 netaddr.IPPortFrom(netaddr.IPv4(10, 10, c, d), uint16(i)),
-				TxBytes:             uint64(i),
-				TxPackets:           uint64(i),
-				RxBytes:             uint64(i),
-				RxPackets:           uint64(i),
-				LifetimeUnixSeconds: 0,
-				Proto:               6,
+				Src:       netaddr.IPPortFrom(netaddr.MustParseIP(podIP), uint16(i)),
+				Dst:       netaddr.IPPortFrom(netaddr.IPv4(10, 10, c, d), uint16(i)),
+				TxBytes:   uint64(i),
+				TxPackets: uint64(i),
+				RxBytes:   uint64(i),
+				RxPackets: uint64(i),
+				Lifetime:  time.Now(),
+				Proto:     6,
 			})
 		}
 	}

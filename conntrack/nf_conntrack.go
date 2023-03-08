@@ -54,7 +54,7 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 
 	metrics.SetConntrackEntriesCount(float64(len(sessions)))
 
-	nowUnixSeconds := uint32(time.Now().Unix())
+	now := time.Now().UTC()
 
 	res := make([]*Entry, 0)
 	var skippedEntriesCount int
@@ -81,7 +81,7 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 			Proto:     *origin.Proto.Number,
 		}
 		if sess.Timeout != nil {
-			entry.LifetimeUnixSeconds = nowUnixSeconds + *sess.Timeout
+			entry.Lifetime = now.Add(time.Second * time.Duration(*sess.Timeout))
 		}
 		replySrc := netaddr.IPPortFrom(ipFromStdIP(*reply.Src), *reply.Proto.SrcPort)
 		// Probably ClusterIP service, remap destination to actual pod IP.
@@ -94,14 +94,14 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 
 		// Cilium stores two records for single flow.
 		entry2 := &Entry{
-			Src:                 entry.Dst,
-			Dst:                 entry.Src,
-			TxBytes:             entry.RxBytes,
-			TxPackets:           entry.RxPackets,
-			RxBytes:             entry.TxBytes,
-			RxPackets:           entry.RxPackets,
-			Proto:               entry.Proto,
-			LifetimeUnixSeconds: entry.LifetimeUnixSeconds,
+			Src:       entry.Dst,
+			Dst:       entry.Src,
+			TxBytes:   entry.RxBytes,
+			TxPackets: entry.RxPackets,
+			RxBytes:   entry.TxBytes,
+			RxPackets: entry.RxPackets,
+			Proto:     entry.Proto,
+			Lifetime:  entry.Lifetime,
 		}
 		if filter(entry2) {
 			res = append(res, entry2)

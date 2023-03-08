@@ -146,8 +146,8 @@ func (c *Collector) collect() error {
 			pm.TxPackets += txPackets
 			pm.RxBytes += rxBytes
 			pm.RxPackets += rxPackets
-			if conn.LifetimeUnixSeconds > pm.lifetimeUnixSeconds {
-				pm.lifetimeUnixSeconds = conn.LifetimeUnixSeconds
+			if conn.Lifetime.After(pm.lifetime) {
+				pm.lifetime = conn.Lifetime
 			}
 		} else {
 			pm, err := c.initNewPodNetworkMetric(conn)
@@ -171,18 +171,18 @@ func (c *Collector) initNewPodNetworkMetric(conn *conntrack.Entry) (*PodNetworkM
 	}
 	dstIPString := conn.Dst.IP().String()
 	metric := PodNetworkMetric{
-		SrcIP:               conn.Src.IP().String(),
-		SrcPod:              pod.Name,
-		SrcNamespace:        pod.Namespace,
-		SrcNode:             pod.Spec.NodeName,
-		DstIP:               dstIPString,
-		DstIPType:           ipType(conn.Dst.IP()),
-		TxBytes:             conn.TxBytes,
-		TxPackets:           conn.TxPackets,
-		RxBytes:             conn.RxBytes,
-		RxPackets:           conn.RxPackets,
-		Proto:               conntrack.ProtoString(conn.Proto),
-		lifetimeUnixSeconds: conn.LifetimeUnixSeconds,
+		SrcIP:        conn.Src.IP().String(),
+		SrcPod:       pod.Name,
+		SrcNamespace: pod.Namespace,
+		SrcNode:      pod.Spec.NodeName,
+		DstIP:        dstIPString,
+		DstIPType:    ipType(conn.Dst.IP()),
+		TxBytes:      conn.TxBytes,
+		TxPackets:    conn.TxPackets,
+		RxBytes:      conn.RxBytes,
+		RxPackets:    conn.RxPackets,
+		Proto:        conntrack.ProtoString(conn.Proto),
+		lifetime:     conn.Lifetime,
 	}
 
 	srcNode, err := c.kubeWatcher.GetNodeByName(pod.Spec.NodeName)
@@ -250,20 +250,20 @@ func (c *Collector) export() {
 }
 
 func (c *Collector) cleanup() {
-	start := time.Now()
-	nowUnixSeconds := getUnixNowSeconds(c.currentTimeGetter)
+	start := c.currentTimeGetter().UTC()
+	now := start
 	deletedEntriesCount := 0
 	deletedPodMetricsCount := 0
 
 	for key, e := range c.entriesCache {
-		if e.LifetimeUnixSeconds < nowUnixSeconds {
+		if now.After(e.Lifetime) {
 			delete(c.entriesCache, key)
 			deletedEntriesCount++
 		}
 	}
 
 	for key, m := range c.podMetrics {
-		if m.lifetimeUnixSeconds < nowUnixSeconds {
+		if now.After(m.lifetime) {
 			delete(c.podMetrics, key)
 			deletedPodMetricsCount++
 		}
@@ -348,8 +348,4 @@ func ipType(ip netaddr.IP) string {
 		return "private"
 	}
 	return "public"
-}
-
-func getUnixNowSeconds(now func() time.Time) uint32 {
-	return uint32(now().Unix())
 }
