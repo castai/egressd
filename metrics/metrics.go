@@ -35,8 +35,8 @@ func init() {
 	)
 }
 
-func IncExportedEvents() {
-	exportedEventsTotal.Inc()
+func IncExportedEvents(v float64) {
+	exportedEventsTotal.Add(v)
 }
 
 func IncDroppedEvents() {

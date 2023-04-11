@@ -6,14 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/castai/egressd/conntrack"
-	"github.com/castai/egressd/kube"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/castai/egressd/conntrack"
+	"github.com/castai/egressd/pb"
 )
 
 func TestCollector(t *testing.T) {
@@ -39,11 +40,9 @@ func TestCollector(t *testing.T) {
 
 	newCollector := func(connTracker conntrack.Client) *Collector {
 		return New(Config{
-			ReadInterval:     time.Millisecond,
-			FlushInterval:    2 * time.Millisecond,
-			CleanupInterval:  3 * time.Millisecond,
-			NodeName:         "n1",
-			MetricBufferSize: 1000,
+			ReadInterval:    time.Millisecond,
+			CleanupInterval: 3 * time.Millisecond,
+			NodeName:        "n1",
 		}, log,
 			kubeWatcher,
 			connTracker,
@@ -78,15 +77,6 @@ func TestCollector(t *testing.T) {
 
 		coll := newCollector(connTracker)
 
-		var metrics []PodNetworkMetric
-		done := make(chan struct{})
-		go func() {
-			for e := range coll.GetMetricsChan() {
-				metrics = append(metrics, *e)
-			}
-			done <- struct{}{}
-		}()
-
 		// Collect first time.
 		r.NoError(coll.collect())
 
@@ -114,48 +104,33 @@ func TestCollector(t *testing.T) {
 		connTracker.entries = initialEntries
 		r.NoError(coll.collect())
 
-		// Flush and export metrics.
-		coll.export()
-
-		close(coll.metricsChan)
-		<-done
-
-		sort.Slice(metrics, func(i, j int) bool {
-			return metrics[i].Proto < metrics[j].Proto
+		items := lo.Map(lo.Values(coll.podMetrics), func(item *rawNetworkMetric, index int) *pb.RawNetworkMetric {
+			return item.RawNetworkMetric
 		})
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].Proto < items[j].Proto
+		})
+		r.Len(items, 2)
 
-		r.Len(metrics, 2)
-		m1 := metrics[0]
-		r.Equal(PodNetworkMetric{
-			SrcIP:        "10.14.7.12",
-			SrcPod:       "p1",
-			SrcNamespace: "team1",
-			SrcNode:      "n1",
-			DstIP:        "10.14.7.5",
-			DstIPType:    "private",
-			TxBytes:      35,
-			TxPackets:    3,
-			RxBytes:      30,
-			RxPackets:    1,
-			Proto:        "TCP",
-			TS:           1577840461000,
-		}, m1)
+		r.Equal(&pb.RawNetworkMetric{
+			SrcIp:     168691468,
+			DstIp:     168691461,
+			TxBytes:   35,
+			TxPackets: 3,
+			RxBytes:   30,
+			RxPackets: 1,
+			Proto:     6,
+		}, items[0])
 
-		m2 := metrics[1]
-		r.Equal(PodNetworkMetric{
-			SrcIP:        "10.14.7.12",
-			SrcPod:       "p1",
-			SrcNamespace: "team1",
-			SrcNode:      "n1",
-			DstIP:        "10.14.7.5",
-			DstIPType:    "private",
-			TxBytes:      40,
-			TxPackets:    1,
-			RxBytes:      0,
-			RxPackets:    0,
-			Proto:        "UDP",
-			TS:           1577840461000,
-		}, m2)
+		r.Equal(&pb.RawNetworkMetric{
+			SrcIp:     168691468,
+			DstIp:     168691461,
+			TxBytes:   40,
+			TxPackets: 1,
+			RxBytes:   0,
+			RxPackets: 0,
+			Proto:     17,
+		}, items[1])
 	})
 
 	t.Run("multiple collect with no new entries", func(t *testing.T) {
@@ -227,8 +202,8 @@ func TestCollector(t *testing.T) {
 		coll := newCollector(connTracker)
 		coll.entriesCache[0] = &conntrack.Entry{Lifetime: now.Add(10000 * time.Second)}
 		coll.entriesCache[1] = &conntrack.Entry{Lifetime: now.Add(-100 * time.Second)}
-		coll.podMetrics[0] = &PodNetworkMetric{lifetime: now.Add(10000 * time.Second)}
-		coll.podMetrics[1] = &PodNetworkMetric{lifetime: now.Add(-150 * time.Second)}
+		coll.podMetrics[0] = &rawNetworkMetric{lifetime: now.Add(10000 * time.Second)}
+		coll.podMetrics[1] = &rawNetworkMetric{lifetime: now.Add(-150 * time.Second)}
 
 		coll.cleanup()
 		entries := lo.Values(coll.entriesCache)
@@ -282,11 +257,9 @@ func BenchmarkCollector(b *testing.B) {
 	}
 	connTracker := &mockConntrack{entries: conns}
 	coll := New(Config{
-		ReadInterval:     time.Millisecond,
-		FlushInterval:    2 * time.Millisecond,
-		CleanupInterval:  3 * time.Millisecond,
-		NodeName:         "n1",
-		MetricBufferSize: 1000,
+		ReadInterval:    time.Millisecond,
+		CleanupInterval: 3 * time.Millisecond,
+		NodeName:        "n1",
 	}, log,
 		kubeWatcher,
 		connTracker,
@@ -335,40 +308,10 @@ func (m *mockConntrack) Close() error {
 }
 
 type mockKubeWatcher struct {
-	pods  []*corev1.Pod
-	nodes []*corev1.Node
+	pods []*corev1.Pod
 }
 
-func (m *mockKubeWatcher) GetNodeByIP(ip string) (*corev1.Node, error) {
-	for _, node := range m.nodes {
-		for _, addr := range node.Status.Addresses {
-			if addr.Address == ip {
-				return node, nil
-			}
-		}
-	}
-	return nil, kube.ErrNotFound
-}
-
-func (m *mockKubeWatcher) GetPodByIP(ip string) (*corev1.Pod, error) {
-	for _, pod := range m.pods {
-		if pod.Status.PodIP == ip {
-			return pod, nil
-		}
-	}
-	return nil, kube.ErrNotFound
-}
-
-func (m *mockKubeWatcher) GetNodeByName(name string) (*corev1.Node, error) {
-	for _, node := range m.nodes {
-		if node.Name == name {
-			return node, nil
-		}
-	}
-	return nil, kube.ErrNotFound
-}
-
-func (m *mockKubeWatcher) GetPodsByNode(nodeName string) ([]*corev1.Pod, error) {
+func (m *mockKubeWatcher) Get(nodeName string) ([]*corev1.Pod, error) {
 	var res []*corev1.Pod
 	for _, pod := range m.pods {
 		if pod.Spec.NodeName == nodeName {

@@ -1,7 +1,25 @@
-package collector
+package types
 
 import "time"
 
+// ConntrackMetric is sent from each egressd agent pod to exporter instance.
+type ConntrackMetric struct {
+	SrcIP     string `json:"src_ip"`
+	DstIP     string `json:"dst_ip"`
+	TxBytes   uint64 `json:"tx_bytes,omitempty"`
+	TxPackets uint64 `json:"tx_packets,omitempty"`
+	RxBytes   uint64 `json:"rx_bytes,omitempty"`
+	RxPackets uint64 `json:"rx_packets,omitempty"`
+	Proto     uint8  `json:"proto"`
+	TS        uint64 `json:"ts,omitempty"`
+
+	// lifetime is used to remove old pod metrics.
+	// This will happen if there are no more conntrack entries
+	// updating this metric.
+	Lifetime time.Time `json:"-"`
+}
+
+// PodNetworkMetric is exported metric format.
 type PodNetworkMetric struct {
 	SrcIP        string `json:"src_ip"`
 	SrcPod       string `json:"src_pod,omitempty"`
@@ -24,5 +42,5 @@ type PodNetworkMetric struct {
 	// lifetime is used to remove old pod metrics.
 	// This will happen if there are no more conntrack entries
 	// updating this metric.
-	lifetime time.Time
+	Lifetime time.Time `json:"-"`
 }

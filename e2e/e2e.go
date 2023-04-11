@@ -13,7 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/castai/egressd/collector"
+	"github.com/castai/egressd/types"
+
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -123,13 +124,13 @@ func (m *mockAPI) start() {
 	}
 }
 
-func (m *mockAPI) getLogs() ([]collector.PodNetworkMetric, error) {
+func (m *mockAPI) getLogs() ([]types.PodNetworkMetric, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var res []collector.PodNetworkMetric
+	var res []types.PodNetworkMetric
 	for _, chunk := range m.receivedLogs {
-		var tmp []collector.PodNetworkMetric
+		var tmp []types.PodNetworkMetric
 		if err := json.Unmarshal(chunk, &tmp); err != nil {
 			return nil, err
 		}

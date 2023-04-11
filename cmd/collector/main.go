@@ -12,31 +12,29 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/castai/egressd/collector"
-	"github.com/castai/egressd/conntrack"
-	"github.com/castai/egressd/exporter"
-	"github.com/castai/egressd/kube"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/flowcontrol"
+
+	"github.com/castai/egressd/collector"
+	"github.com/castai/egressd/conntrack"
+	"github.com/castai/egressd/kube"
 )
 
 var (
 	kubeconfig        = flag.String("kubeconfig", "", "")
 	logLevel          = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
 	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
-	flushInterval     = flag.Duration("flush-interval", 55*time.Second, "Interval of time for flushing pod network cache")
-	cleanupInterval   = flag.Duration("cleanup-interval", 123*time.Second, "Interval of time for cleanup cached conntrack entries")
-	httpAddr          = flag.String("http-addr", ":6060", "")
-	exportMode        = flag.String("export-mode", "http", "Export mode. Available values: http,file")
-	exportHTTPAddr    = flag.String("export-http-addr", "http://egressd-aggregator:6000", "Export to vector aggregator http source")
-	exportFileName    = flag.String("export-file", "/var/run/egressd/egressd.log", "Export file name")
+	cleanupInterval   = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
+	httpListenPort    = flag.Int("http-listen-port", 8008, "HTTP server listen port")
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
-	metricBufferSize  = flag.Int("metric-buffer-size", 10000, "Amount of entries that metrics buffer allows storing before blocking")
 	dumpCT            = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
 	ciliumClockSource = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
 )
@@ -65,31 +63,12 @@ func main() {
 		return
 	}
 
-	ctx, shutdown := context.WithCancel(context.Background())
-	defer shutdown()
-
-	go func() {
-		stopper := make(chan os.Signal, 1)
-		signal.Notify(stopper, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
-		<-stopper
-		shutdown()
-	}()
-
-	go func() {
-		mux := http.NewServeMux()
-		addPprofHandlers(mux)
-		mux.Handle("/metrics", promhttp.Handler())
-		_ = http.ListenAndServe(*httpAddr, mux) //nolint:gosec
-	}()
-
-	if err := run(ctx, log); err != nil && !errors.Is(err, context.Canceled) {
+	if err := run(log); err != nil && !errors.Is(err, context.Canceled) {
 		log.Fatal(err)
 	}
 }
 
-func run(ctx context.Context, log logrus.FieldLogger) error {
-	log.Infof("running egressd, version=%s, commit=%s, ref=%s, read-interval=%s, flush-interval=%s", Version, GitCommit, GitRef, *readInterval, *flushInterval)
-
+func run(log logrus.FieldLogger) error {
 	restconfig, err := retrieveKubeConfig(log, *kubeconfig)
 	if err != nil {
 		return err
@@ -100,9 +79,16 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 		return err
 	}
 
-	kubeWatcher := kube.NewWatcher(clientset)
-	var conntracker conntrack.Client
+	// Setup shared informer indexers.
+	informersFactory := informers.NewSharedInformerFactoryWithOptions(clientset, 30*time.Second, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+		options.FieldSelector = "spec.nodeName=" + os.Getenv("NODE_NAME")
+	}))
+	podsInformer := informersFactory.Core().V1().Pods().Informer()
+	podsByNodeCache := kube.NewPodsByNodeCache(podsInformer)
+	informersFactory.Start(wait.NeverStop)
+	informersFactory.WaitForCacheSync(wait.NeverStop)
 
+	var conntracker conntrack.Client
 	ciliumAvailable := conntrack.CiliumAvailable()
 	if ciliumAvailable {
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
@@ -115,43 +101,58 @@ func run(ctx context.Context, log logrus.FieldLogger) error {
 	}
 	cfg := collector.Config{
 		ReadInterval:      *readInterval,
-		FlushInterval:     *flushInterval,
 		CleanupInterval:   *cleanupInterval,
 		NodeName:          os.Getenv("NODE_NAME"),
 		ExcludeNamespaces: *excludeNamespaces,
-		MetricBufferSize:  *metricBufferSize,
 	}
-	coll := collector.New(cfg, log, kubeWatcher, conntracker, collector.CurrentTimeGetter())
+	coll := collector.New(
+		cfg,
+		log,
+		podsByNodeCache,
+		conntracker,
+		collector.CurrentTimeGetter(),
+	)
 
-	switch *exportMode {
-	case "http":
-		export := exporter.NewHTTPExporter(exporter.HTTPConfig{Addr: *exportHTTPAddr}, log, coll)
-		go func() {
-			if err := export.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-				log.Errorf("exporter failed: %v", err)
-			}
-		}()
-	case "file":
-		if *exportFileName != "" {
-			export := exporter.NewFileExporter(exporter.FileConfig{
-				ExportFilename:      *exportFileName,
-				ExportFileMaxSizeMB: 10,
-				MaxBackups:          3,
-				Compress:            false,
-			}, log, coll)
-			go func() {
-				if err := export.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-					log.Errorf("exporter failed: %v", err)
-				}
-			}()
-		} else {
-			return errors.New("export file name is empty")
+	mux := http.NewServeMux()
+	addPprofHandlers(mux)
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/healthz", healthHandler)
+	mux.HandleFunc("/api/v1/raw-network-metrics", coll.GetRawNetworkMetricsHandler)
+
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", *httpListenPort),
+		Handler:           mux,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		stopper := make(chan os.Signal, 1)
+		signal.Notify(stopper, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+		<-stopper
+
+		// Stop http server.
+		ctx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Errorf("http server shutdown: %v", err)
 		}
-	default:
-		return fmt.Errorf("export mode %q is not supported", *exportMode)
-	}
 
-	return coll.Start(ctx)
+		// Cancel context for other components like collector.
+		cancel()
+	}()
+
+	go func() {
+		if err := coll.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Errorf("starting collector: %v", err)
+		}
+	}()
+
+	log.Infof("running egressd, version=%s, commit=%s, ref=%s, read-interval=%s", Version, GitCommit, GitRef, *readInterval)
+
+	return srv.ListenAndServe()
 }
 
 func retrieveKubeConfig(log logrus.FieldLogger, kubepath string) (*rest.Config, error) {
@@ -182,6 +183,10 @@ func addPprofHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+}
+
+func healthHandler(w http.ResponseWriter, req *http.Request) {
+	_, _ = w.Write([]byte("Ok"))
 }
 
 func dumpConntrack(log logrus.FieldLogger) error {
