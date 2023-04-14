@@ -19,14 +19,18 @@ GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o ../bin/$name-e2e .
 popd
 docker build . -t $name-e2e:local --build-arg image_tag=$IMAGE_TAG -f Dockerfile.e2e
 
-# Load local image into kind.
+# Load e2e image into kind.
 kind load docker-image $name-e2e:local --name $KIND_CONTEXT
 
 if [ "$IMAGE_TAG" == "local" ]
 then
-  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name .
+  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name ./cmd/collector
   docker build . -t $name:local -f Dockerfile
   kind load docker-image $name:local --name $KIND_CONTEXT
+
+  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name-exporter ./cmd/exporter
+  docker build . -t $name-exporter:local -f Dockerfile.exporter
+  kind load docker-image $name-exporter:local --name $KIND_CONTEXT
 fi
 
 # Deploy e2e resources.

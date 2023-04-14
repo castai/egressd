@@ -25,6 +25,12 @@ helm upgrade --install castai-egressd castai-helm/egressd -n castai-agent \
 
 ### Development
 
+Start all components + test grafana,promtheus in tilt local k8s cluster.
 ```
 tilt up
+```
+
+Run e2e tests locally
+```
+KIND_CONTEXT=tilt IMAGE_TAG=local ./e2e/run.sh
 ```

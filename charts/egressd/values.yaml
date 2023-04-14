@@ -67,7 +67,7 @@ collector:
 
   dnsPolicy: ClusterFirstWithHostNet
 
-  httpListenPort: 8008
+  httpListenPort: 6061
 
   # Extra args for egressd container.
   extraArgs:

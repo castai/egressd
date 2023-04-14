@@ -13,11 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/castai/egressd/types"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/json"
+
+	"github.com/castai/egressd/pb"
 )
 
 var (
@@ -53,7 +54,7 @@ func run(log logrus.FieldLogger) error {
 	}
 	fmt.Printf("installed chart:\n%s\n", out)
 
-	if err := api.assertLogsReceived(ctx); err != nil {
+	if err := api.assertMetricsReceived(ctx); err != nil {
 		return err
 	}
 
@@ -69,25 +70,35 @@ func installChart(ns, imageTag string) ([]byte, error) {
 		repo = "egressd"
 	}
 	//nolint:gosec
-	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf(`helm upgrade --install castai-egressd ./charts/egressd \
+	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf(
+		`helm upgrade --install castai-egressd ./charts/egressd \
   -n %s --create-namespace \
-  --set image.repository=%s \
-  --set image.tag=%s \
+  --set collector.image.repository=%s \
+  --set collector.image.tag=%s \
+  --set collector.extraArgs.log-level=debug \
+  --set exporter.image.repository=%s \
+  --set exporter.image.tag=%s \
+  --set exporter.structuredConfig.exportInterval=10s \
+  --set exporter.extraArgs.log-level=debug \
   --set castai.apiURL=%s \
   --set castai.clusterID=e2e \
   --set castai.apiKey=key \
-  --set extraArgs.flush-interval=5s \
-  --set aggregator.logToStdout=true \
-  --set aggregator.castaiSink.timeoutSecs=5 \
-  --wait --timeout=1m`, ns, repo, imageTag, apiURL))
+  --wait --timeout=1m`,
+		ns,
+		repo,
+		imageTag,
+		repo+"-exporter",
+		imageTag,
+		apiURL,
+	))
 	return cmd.CombinedOutput()
 }
 
 type mockAPI struct {
 	log logrus.FieldLogger
 
-	mu           sync.Mutex
-	receivedLogs [][]byte
+	mu                          sync.Mutex
+	receivedMetricsBatchesBytes [][]byte
 }
 
 func (m *mockAPI) start() {
@@ -111,9 +122,9 @@ func (m *mockAPI) start() {
 			return
 		}
 
-		fmt.Printf("received logs, cluster_id=%s, body=%d\n", clusterID, len(rawBody))
+		fmt.Printf("received metrics batch, cluster_id=%s, size_bytes=%d\n", clusterID, len(rawBody))
 		m.mu.Lock()
-		m.receivedLogs = append(m.receivedLogs, rawBody)
+		m.receivedMetricsBatchesBytes = append(m.receivedMetricsBatchesBytes, rawBody)
 		m.mu.Unlock()
 
 		w.WriteHeader(http.StatusAccepted)
@@ -124,26 +135,26 @@ func (m *mockAPI) start() {
 	}
 }
 
-func (m *mockAPI) getLogs() ([]types.PodNetworkMetric, error) {
+func (m *mockAPI) getPodNetworkMetrics() ([]*pb.PodNetworkMetric, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var res []types.PodNetworkMetric
-	for _, chunk := range m.receivedLogs {
-		var tmp []types.PodNetworkMetric
-		if err := json.Unmarshal(chunk, &tmp); err != nil {
+	var res []*pb.PodNetworkMetric
+	for _, chunk := range m.receivedMetricsBatchesBytes {
+		var batch pb.PodNetworkMetricBatch
+		if err := proto.Unmarshal(chunk, &batch); err != nil {
 			return nil, err
 		}
-		res = append(res, tmp...)
+		res = append(res, batch.Items...)
 	}
 	return res, nil
 }
 
-func (m *mockAPI) assertLogsReceived(ctx context.Context) error {
+func (m *mockAPI) assertMetricsReceived(ctx context.Context) error {
 	for {
 		select {
 		case <-time.After(3 * time.Second):
-			logs, err := m.getLogs()
+			logs, err := m.getPodNetworkMetrics()
 			if err != nil {
 				return err
 			}
@@ -151,10 +162,10 @@ func (m *mockAPI) assertLogsReceived(ctx context.Context) error {
 				continue
 			}
 			logEntry := logs[0]
-			if logEntry.SrcIP == "" {
+			if logEntry.SrcIp == 0 {
 				return errors.New("source ip is missing")
 			}
-			if logEntry.DstIP == "" {
+			if logEntry.DstIp == 0 {
 				return errors.New("dest ip is missing")
 			}
 			return nil
