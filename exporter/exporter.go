@@ -112,23 +112,22 @@ func (e *Exporter) export(ctx context.Context) error {
 		default:
 		}
 
-		fetchGroup.Go(func() (err error) {
-			defer func() {
-				if err != nil {
-					pulledBatch <- &pb.RawNetworkMetricBatch{}
-				}
-			}()
+		fetchGroup.Go(func() error {
 			url := getCollectorPodMetricsServerURL(pod)
-			batch, err := e.fetchRawNetworkMetricsBatch(ctx, url)
-			if err != nil {
-				e.log.Errorf("fetching metrics from collector, url=%s: %v", url, err)
+			if err := func() error {
+				batch, err := e.fetchRawNetworkMetricsBatch(ctx, url)
+				if err != nil {
+					return fmt.Errorf("fetching metrics from collector, url=%s: %w", url, err)
+				}
+				if len(batch.Items) == 0 {
+					return fmt.Errorf("no metrics found in collector %q", pod.Name)
+				}
+				pulledBatch <- batch
 				return nil
+			}(); err != nil {
+				pulledBatch <- &pb.RawNetworkMetricBatch{}
+				e.log.Error(err)
 			}
-			if len(batch.Items) == 0 {
-				e.log.Warnf("no metrics found in collector %q", pod.Name)
-				return nil
-			}
-			pulledBatch <- batch
 			return nil
 		})
 	}
