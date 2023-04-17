@@ -100,52 +100,53 @@ func (e *Exporter) export(ctx context.Context) error {
 	// Fetch network metrics from all collectors.
 	e.log.Debugf("fetching network metrics from %d collector(s)", collectorsCount)
 
-	pulledBatch := make(chan *pb.RawNetworkMetricBatch, collectorsCount)
+	pulledBatch := make(chan *pb.RawNetworkMetricBatch, collectorsConcurrentFetch)
 
-	var fetchGroup errgroup.Group
-	fetchGroup.SetLimit(collectorsConcurrentFetch)
-	for _, pod := range collectorPodsList.Items {
-		pod := pod
+	go func() {
+		var fetchGroup errgroup.Group
+		fetchGroup.SetLimit(collectorsConcurrentFetch)
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
+		for _, pod := range collectorPodsList.Items {
+			pod := pod
 
-		url := getCollectorPodMetricsServerURL(pod)
-		if url == "" {
-			e.log.Warnf("collector pod %q without metrics fetch url", pod.Name)
-			continue
-		}
-
-		fetchGroup.Go(func() error {
-			if err := func() error {
-				batch, err := e.fetchRawNetworkMetricsBatch(ctx, url)
-				if err != nil {
-					return fmt.Errorf("fetching metrics from collector, url=%s: %w", url, err)
-				}
-				if len(batch.Items) == 0 {
-					return fmt.Errorf("no metrics found in collector %q", pod.Name)
-				}
-				pulledBatch <- batch
-				return nil
-			}(); err != nil {
-				pulledBatch <- &pb.RawNetworkMetricBatch{}
-				e.log.Error(err)
+			select {
+			case <-ctx.Done():
+				return
+			default:
 			}
-			return nil
-		})
-	}
-	if err := fetchGroup.Wait(); err != nil {
-		// Should not happen. Individual collectors errors are only logged.
-		return err
-	}
+
+			url := getCollectorPodMetricsServerURL(pod)
+			if url == "" {
+				e.log.Warnf("collector pod %q without metrics fetch url", pod.Name)
+				continue
+			}
+
+			fetchGroup.Go(func() error {
+				if err := func() error {
+					batch, err := e.fetchRawNetworkMetricsBatch(ctx, url)
+					if err != nil {
+						return fmt.Errorf("fetching metrics from collector, url=%s: %w", url, err)
+					}
+					if len(batch.Items) == 0 {
+						return fmt.Errorf("no metrics found in collector %q", pod.Name)
+					}
+					pulledBatch <- batch
+					return nil
+				}(); err != nil {
+					e.log.Error(err)
+				}
+				return nil
+			})
+		}
+		if err := fetchGroup.Wait(); err != nil {
+			e.log.Errorf("waiting for fetch group: %v", err)
+		}
+		close(pulledBatch)
+	}()
 
 	// Aggregate raw metrics into pod metrics.
 	var podsMetrics []*pb.PodNetworkMetric
-	for i := 0; i < collectorsCount; i++ {
-		batch := <-pulledBatch
+	for batch := range pulledBatch {
 		for _, rawMetrics := range batch.Items {
 			podMetrics, err := e.buildPodNetworkMetric(rawMetrics)
 			if err != nil {
