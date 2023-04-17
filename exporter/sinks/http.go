@@ -56,7 +56,7 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 	for k, v := range s.cfg.Headers {
 		header.Set(k, os.ExpandEnv(v))
 	}
-	if _, found := header[headerUserAgent]; !found {
+	if _, found := s.cfg.Headers[headerUserAgent]; !found {
 		header.Set(headerUserAgent, "castai-egressd/"+s.binVersion)
 	}
 
@@ -94,6 +94,7 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
+	req.Header = header
 
 	s.log.Infof("pushing metrics, items=%d, size_bytes=%d", len(batch.Items), payloadBuf.Len())
 

@@ -25,9 +25,11 @@ func TestHTTPSink(t *testing.T) {
 	log.SetLevel(logrus.DebugLevel)
 
 	reqBytesCh := make(chan []byte, 1)
+	reqHeaders := make(chan http.Header, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		reqBytes, err := io.ReadAll(req.Body)
 		reqBytesCh <- reqBytes
+		reqHeaders <- req.Header
 		r.NoError(err)
 	}))
 	defer srv.Close()
@@ -79,4 +81,8 @@ func TestHTTPSink(t *testing.T) {
 	r.NoError(proto.Unmarshal(pbBuf.Bytes(), &actualBatch))
 	r.Len(actualBatch.Items, 1)
 	r.Equal(expectedBatch.String(), actualBatch.String())
+
+	headers := <-reqHeaders
+	r.Equal("castai-egressd/0.0.0", headers[headerUserAgent][0])
+	r.Equal("1", headers["Custom-Header"][0])
 }

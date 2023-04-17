@@ -95,7 +95,7 @@ exporter:
           url: "{{.Values.castai.apiURL}}/v1/security/egress/{{.Values.castai.clusterID}}"
           compression: gzip
           encoding: protobuf
-          method: post
+          method: POST
           headers:
             X-API-Key: "${CASTAI_API_KEY}"
     {{- end }}
