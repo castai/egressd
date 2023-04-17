@@ -150,7 +150,11 @@ func (e *Exporter) export(ctx context.Context) error {
 		for _, rawMetrics := range batch.Items {
 			podMetrics, err := e.buildPodNetworkMetric(rawMetrics)
 			if err != nil {
-				e.log.Errorf("init pod network metrics: %v", err)
+				if errors.Is(err, kube.ErrNotFound) {
+					e.log.Warnf("skipping pod metrics: %v", err)
+				} else {
+					e.log.Errorf("init pod network metrics: %v", err)
+				}
 				continue
 			}
 			podsMetrics = append(podsMetrics, podMetrics)
@@ -181,7 +185,7 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 	srcIP := ipFromInt32(conn.SrcIp)
 	pod, err := e.kubeWatcher.GetPodByIP(srcIP.String())
 	if err != nil {
-		return nil, fmt.Errorf("getting pod by ip %q: %w", srcIP.String(), err)
+		return nil, fmt.Errorf("getting src pod by ip %q: %w", srcIP.String(), err)
 	}
 	dstIP := ipFromInt32(conn.DstIp)
 	metric := pb.PodNetworkMetric{
