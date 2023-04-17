@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -176,12 +177,12 @@ func (e *Exporter) export(ctx context.Context) error {
 }
 
 func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetworkMetric, error) {
-	srcIP := parseIP(conn.SrcIp)
+	srcIP := ipFromInt32(conn.SrcIp)
 	pod, err := e.kubeWatcher.GetPodByIP(srcIP.String())
 	if err != nil {
 		return nil, fmt.Errorf("getting pod by ip %q: %w", srcIP.String(), err)
 	}
-	dstIP := parseIP(conn.DstIp)
+	dstIP := ipFromInt32(conn.DstIp)
 	metric := pb.PodNetworkMetric{
 		SrcIp:        conn.SrcIp,
 		SrcPod:       pod.Name,
@@ -270,8 +271,10 @@ func getNodeZone(node *corev1.Node) string {
 	return node.Labels["topology.kubernetes.io/zone"]
 }
 
-func parseIP(v int32) netaddr.IP {
-	return netaddr.IPFrom4([4]byte{byte(v >> 24), byte(v >> 16), byte(v >> 8), byte(v)})
+func ipFromInt32(v int32) netaddr.IP {
+	ipBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(ipBytes, uint32(v))
+	return netaddr.IPv4(ipBytes[0], ipBytes[1], ipBytes[2], ipBytes[3])
 }
 
 func newHTTPClient() *http.Client {
