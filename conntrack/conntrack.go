@@ -28,7 +28,6 @@ func All() EntriesFilter {
 
 func FilterBySrcIP(ips map[netaddr.IP]struct{}) EntriesFilter {
 	return func(e *Entry) bool {
-		e.Src.IP()
 		_, found := ips[e.Src.IP()]
 		return found
 	}

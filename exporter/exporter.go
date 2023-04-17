@@ -112,8 +112,13 @@ func (e *Exporter) export(ctx context.Context) error {
 		default:
 		}
 
+		url := getCollectorPodMetricsServerURL(pod)
+		if url == "" {
+			e.log.Warnf("collector pod %q without metrics fetch url", pod.Name)
+			continue
+		}
+
 		fetchGroup.Go(func() error {
-			url := getCollectorPodMetricsServerURL(pod)
 			if err := func() error {
 				batch, err := e.fetchRawNetworkMetricsBatch(ctx, url)
 				if err != nil {
@@ -132,6 +137,7 @@ func (e *Exporter) export(ctx context.Context) error {
 		})
 	}
 	if err := fetchGroup.Wait(); err != nil {
+		// Should not happen. Individual collectors errors are only logged.
 		return err
 	}
 
