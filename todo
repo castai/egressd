@@ -1,6 +1,0 @@
-// Old pods metrics are returned.
-// Gaps and jumps.
-// Fix mimir security context.
-// Fix duplicate metrics, should be fixed with aggregator.
-// Check conntrack directions. Metrics for ingress egress should match tx rx bytes.
-// Check why promtail doesn't contain dst pod.
