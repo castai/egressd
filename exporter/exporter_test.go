@@ -156,12 +156,12 @@ func TestExporter(t *testing.T) {
 	r.Len(pushedBatch.Items, 1)
 	item := pushedBatch.Items[0]
 	r.Equal(&pb.PodNetworkMetric{
-		SrcIp:        168691468,
+		SrcIp:        "10.14.7.12",
 		SrcPod:       "p1",
 		SrcNamespace: "team1",
 		SrcNode:      "n1",
 		SrcZone:      "us-east-1a",
-		DstIp:        168691461,
+		DstIp:        "10.14.7.5",
 		DstPod:       "p2",
 		DstNamespace: "team2",
 		DstNode:      "n1",

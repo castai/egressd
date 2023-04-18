@@ -44,7 +44,7 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 	now := s.timeGetter()
 
 	for _, m := range batch.Items {
-		dstIP := ipFromInt32(m.DstIp)
+		dstIP, _ := netaddr.ParseIP(m.DstIp)
 		dstIPType := "public"
 		if dstIP.IsPrivate() {
 			dstIPType = "private"
@@ -56,7 +56,7 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 				{Name: "src_node", Value: m.SrcNode},
 				{Name: "src_namespace", Value: m.SrcNamespace},
 				{Name: "src_zone", Value: m.SrcZone},
-				{Name: "src_ip", Value: ipFromInt32(m.SrcIp).String()},
+				{Name: "src_ip", Value: m.SrcIp},
 
 				{Name: "dst_pod", Value: m.DstPod},
 				{Name: "dst_node", Value: m.DstNode},
@@ -88,10 +88,6 @@ func isCrossZoneValue(m *pb.PodNetworkMetric) string {
 		return "true"
 	}
 	return "false"
-}
-
-func ipFromInt32(v int32) netaddr.IP {
-	return netaddr.IPFrom4([4]byte{byte(v >> 24), byte(v >> 16), byte(v >> 8), byte(v)})
 }
 
 var protoNames = map[uint8]string{

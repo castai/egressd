@@ -17,21 +17,21 @@ message RawNetworkMetricBatch {
 }
 
 message PodNetworkMetric {
-  int32 src_ip = 1;
+  string src_ip = 1;
   string src_pod = 2;
   string src_namespace = 3;
   string src_node = 4;
-  string src_zone = 6;
-  int32 dst_ip = 7;
-  string dst_pod = 8;
-  string dst_namespace = 9;
-  string dst_node = 10;
-  string dst_zone = 11;
-  int64 tx_bytes = 12;
-  int64 tx_packets = 13;
-  int64 rx_bytes = 14;
-  int64 rx_packets = 15;
-  int32 proto = 16;
+  string src_zone = 5;
+  string dst_ip = 6;
+  string dst_pod = 7;
+  string dst_namespace = 8;
+  string dst_node = 9;
+  string dst_zone = 10;
+  int64 tx_bytes = 11;
+  int64 tx_packets = 12;
+  int64 rx_bytes = 13;
+  int64 rx_packets = 14;
+  int32 proto = 15;
 }
 
 message PodNetworkMetricBatch {

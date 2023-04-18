@@ -189,11 +189,11 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 	}
 	dstIP := ipFromInt32(conn.DstIp)
 	metric := pb.PodNetworkMetric{
-		SrcIp:        conn.SrcIp,
+		SrcIp:        srcIP.String(),
 		SrcPod:       pod.Name,
 		SrcNamespace: pod.Namespace,
 		SrcNode:      pod.Spec.NodeName,
-		DstIp:        conn.DstIp,
+		DstIp:        dstIP.String(),
 		TxBytes:      conn.TxBytes,
 		TxPackets:    conn.TxPackets,
 		RxBytes:      conn.RxBytes,

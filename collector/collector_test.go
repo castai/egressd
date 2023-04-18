@@ -133,6 +133,73 @@ func TestCollector(t *testing.T) {
 		}, items[1])
 	})
 
+	t.Run("group public ips", func(t *testing.T) {
+		r := require.New(t)
+
+		// Initially conntrack entries.
+		connEntries := []conntrack.Entry{
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+				Dst:       netaddr.MustParseIPPort("1.1.1.1:3000"),
+				TxBytes:   10,
+				TxPackets: 1,
+				Proto:     6,
+			},
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+				Dst:       netaddr.MustParseIPPort("8.8.8.8:3000"),
+				TxBytes:   15,
+				TxPackets: 1,
+				Proto:     6,
+			},
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+				TxBytes:   15,
+				TxPackets: 1,
+				Proto:     6,
+			},
+		}
+
+		connTracker := &mockConntrack{
+			entries: connEntries,
+		}
+
+		coll := newCollector(connTracker)
+		coll.cfg.GroupPublicIPs = true
+
+		// Collect first time.
+		r.NoError(coll.collect())
+
+		items := lo.Map(lo.Values(coll.podMetrics), func(item *rawNetworkMetric, index int) *pb.RawNetworkMetric {
+			return item.RawNetworkMetric
+		})
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].Proto < items[j].Proto
+		})
+		r.Len(items, 2)
+
+		r.Equal(&pb.RawNetworkMetric{
+			SrcIp:     168691468,
+			DstIp:     0,
+			TxBytes:   25,
+			TxPackets: 2,
+			RxBytes:   0,
+			RxPackets: 0,
+			Proto:     6,
+		}, items[0])
+
+		r.Equal(&pb.RawNetworkMetric{
+			SrcIp:     168691468,
+			DstIp:     168691461,
+			TxBytes:   15,
+			TxPackets: 1,
+			RxBytes:   0,
+			RxPackets: 0,
+			Proto:     6,
+		}, items[1])
+	})
+
 	t.Run("multiple collect with no new entries", func(t *testing.T) {
 		r := require.New(t)
 

@@ -69,9 +69,9 @@ collector:
 
   httpListenPort: 6061
 
-  # Extra args for egressd container.
+  # Extra args for egressd collector container.
   extraArgs:
-  # metric-buffer-size: 10000
+    group-public-ips: true
 
   prometheusScrape:
     enabled: true
