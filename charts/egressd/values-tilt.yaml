@@ -1,0 +1,26 @@
+collector:
+  image:
+    repository: localhost:5000/egressd
+
+  extraArgs:
+    log-level: debug
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
+
+exporter:
+  image:
+    repository: localhost:5000/egressd-exporter
+
+  extraArgs:
+    log-level: debug
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
+
+  config: |
+    exportInterval: 10s
+    sinks:
+      tilt_prom:
+        prom_remote_write:
+          url: "http://victoria-metrics-single-server:8428/api/v1/write"

@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iperf3-server-deployment
+  namespace: egressd
+  labels:
+    app: iperf3-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iperf3-server
+  template:
+    metadata:
+      labels:
+        app: iperf3-server
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/role
+                    operator: In
+                    values:
+                      - master
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: iperf3-server
+          image: networkstatic/iperf3
+          args: ['-s']
+          ports:
+            - containerPort: 5201
+              name: server
+      terminationGracePeriodSeconds: 0
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf3-server
+spec:
+  selector:
+    app: iperf3-server
+  ports:
+    - protocol: TCP
+      port: 5201
+      targetPort: server
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: iperf3-clients
+  namespace: egressd
+  labels:
+    app: iperf3-client
+spec:
+  selector:
+    matchLabels:
+      app: iperf3-client
+  template:
+    metadata:
+      labels:
+        app: iperf3-client
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: iperf3-client
+          image: networkstatic/iperf3
+          command: ['/bin/sh', '-c', 'while true; do iperf3 -c iperf3-server -b 256 -n 1; sleep 1; done']
+      terminationGracePeriodSeconds: 0

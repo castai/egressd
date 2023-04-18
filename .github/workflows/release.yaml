@@ -36,7 +36,14 @@ jobs:
         run: echo "RELEASE_TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
 
       - name: Build go binary
-        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./cmd/collector
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: 0
+
+      - name: Build egressd exporter go binary
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd-exporter ./cmd/exporter
         env:
           GOOS: linux
           GOARCH: amd64
@@ -49,7 +56,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push release
+      - name: Build and push release (egressd collector)
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -58,6 +65,16 @@ jobs:
           tags: |
             ghcr.io/castai/egressd/egressd:${{ env.RELEASE_TAG }}
             ghcr.io/castai/egressd/egressd:latest
+
+      - name: Build and push release (egressd exporter)
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          file: ./Dockerfile.exporter
+          tags: |
+            ghcr.io/castai/egressd/egressd-exporter:${{ env.RELEASE_TAG }}
+            ghcr.io/castai/egressd/egressd-exporter:latest
 
   release_chart:
     name: Release Helm Chart

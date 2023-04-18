@@ -1,10 +1,5 @@
-fullnameOverride: grafana-egressd
+fullnameOverride: grafana
 adminPassword: admin
-useStatefulSet: true
-persistence:
-  enabled: true
-  type: statefulset
-  size: 2Gi
 grafana.ini:
   server:
     serve_from_sub_path: false
@@ -28,6 +23,5 @@ datasources:
     datasources:
       - name: Prometheus
         type: prometheus
-        url: http://prom-prometheus-server.egressd.svc.cluster.local
+        url: http://victoria-metrics-single-server:8428
         access: proxy
-        isDefault: true

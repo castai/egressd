@@ -38,8 +38,15 @@ jobs:
           key: ${{ runner.os }}-build-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-build-
 
-      - name: Build egressd go binary
-        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./
+      - name: Build egressd collector go binary
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./cmd/collector
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: 0
+
+      - name: Build egressd exporter go binary
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd-exporter ./cmd/exporter
         env:
           GOOS: linux
           GOARCH: amd64
@@ -66,7 +73,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push pr
+      - name: Build and push pr (egressd collector)
         if: ${{ github.event_name == 'pull_request' }}
         uses: docker/build-push-action@v2
         with:
@@ -75,7 +82,16 @@ jobs:
           push: ${{ github.event_name == 'pull_request' }}
           tags: ghcr.io/castai/egressd/egressd:${{ github.sha }}
 
-      - name: Build and push main
+      - name: Build and push pr (egressd exporter)
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile.exporter
+          push: ${{ github.event_name == 'pull_request' }}
+          tags: ghcr.io/castai/egressd/egressd-exporter:${{ github.sha }}
+
+      - name: Build and push main (egressd collector)
         if: ${{ github.event_name != 'pull_request' && github.event_name != 'release' }}
         uses: docker/build-push-action@v2
         with:
@@ -83,6 +99,15 @@ jobs:
           file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/castai/egressd/egressd:${{ github.sha }}
+
+      - name: Build and push main (egressd exporter)
+        if: ${{ github.event_name != 'pull_request' && github.event_name != 'release' }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile.exporter
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/castai/egressd/egressd-exporter:${{ github.sha }}
 
   e2e:
     name: E2E

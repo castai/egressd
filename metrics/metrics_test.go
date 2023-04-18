@@ -11,8 +11,8 @@ import (
 func TestIncExportedEvents(t *testing.T) {
 	r := require.New(t)
 
-	IncExportedEvents()
-	IncExportedEvents()
+	IncExportedEvents(1)
+	IncExportedEvents(1)
 
 	problems, err := testutil.CollectAndLint(exportedEventsTotal)
 	r.NoError(err)

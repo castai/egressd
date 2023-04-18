@@ -3,18 +3,21 @@ package collector
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"hash/maphash"
+	"net/http"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/castai/egressd/conntrack"
-	"github.com/castai/egressd/kube"
-	"github.com/castai/egressd/metrics"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/castai/egressd/conntrack"
+	"github.com/castai/egressd/metrics"
+	"github.com/castai/egressd/pb"
 )
 
 func CurrentTimeGetter() func() time.Time {
@@ -26,22 +29,27 @@ func CurrentTimeGetter() func() time.Time {
 type Config struct {
 	// ReadInterval used for conntrack records scrape.
 	ReadInterval time.Duration
-	// FlushInterval used for aggregated metrics export.
-	FlushInterval time.Duration
 	// CleanupInterval used to remove expired conntrack and pod metrics records.
 	CleanupInterval time.Duration
 	// NodeName is current node name on which egressd is running.
 	NodeName string
 	// ExcludeNamespaces allows to exclude namespaces. Input is comma separated string.
 	ExcludeNamespaces string
-	// MetricBufferSize export channel buffer size.
-	MetricBufferSize int
+}
+
+type podsWatcher interface {
+	Get(nodeName string) ([]*corev1.Pod, error)
+}
+
+type rawNetworkMetric struct {
+	*pb.RawNetworkMetric
+	lifetime time.Time
 }
 
 func New(
 	cfg Config,
 	log logrus.FieldLogger,
-	kubeWatcher kube.Watcher,
+	podsWatcher podsWatcher,
 	conntracker conntrack.Client,
 	currentTimeGetter func() time.Time,
 ) *Collector {
@@ -55,9 +63,6 @@ func New(
 	if cfg.ReadInterval == 0 {
 		panic("read interval not set")
 	}
-	if cfg.FlushInterval == 0 {
-		panic("flush interval not set")
-	}
 	if cfg.CleanupInterval == 0 {
 		panic("cleanup interval not set")
 	}
@@ -65,35 +70,31 @@ func New(
 	return &Collector{
 		cfg:               cfg,
 		log:               log,
-		kubeWatcher:       kubeWatcher,
+		podsWatcher:       podsWatcher,
 		conntracker:       conntracker,
 		entriesCache:      make(map[uint64]*conntrack.Entry),
-		podMetrics:        map[uint64]*PodNetworkMetric{},
-		metricsChan:       make(chan *PodNetworkMetric, cfg.MetricBufferSize),
+		podMetrics:        map[uint64]*rawNetworkMetric{},
 		excludeNsMap:      excludeNsMap,
 		currentTimeGetter: currentTimeGetter,
+		exporterClient:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
 type Collector struct {
 	cfg               Config
 	log               logrus.FieldLogger
-	kubeWatcher       kube.Watcher
+	podsWatcher       podsWatcher
 	conntracker       conntrack.Client
 	entriesCache      map[uint64]*conntrack.Entry
-	podMetrics        map[uint64]*PodNetworkMetric
+	podMetrics        map[uint64]*rawNetworkMetric
 	excludeNsMap      map[string]struct{}
-	metricsChan       chan *PodNetworkMetric
 	currentTimeGetter func() time.Time
-}
-
-func (c *Collector) GetMetricsChan() <-chan *PodNetworkMetric {
-	return c.metricsChan
+	exporterClient    *http.Client
+	mu                sync.Mutex
 }
 
 func (c *Collector) Start(ctx context.Context) error {
 	readTicker := time.NewTicker(c.cfg.ReadInterval)
-	exportTicker := time.NewTicker(c.cfg.FlushInterval)
 	cleanupTicker := time.NewTicker(c.cfg.CleanupInterval)
 
 	for {
@@ -104,11 +105,31 @@ func (c *Collector) Start(ctx context.Context) error {
 			if err := c.collect(); err != nil {
 				c.log.Errorf("collecting: %v", err)
 			}
-		case <-exportTicker.C:
-			c.export()
 		case <-cleanupTicker.C:
 			c.cleanup()
 		}
+	}
+}
+
+func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http.Request) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	items := make([]*pb.RawNetworkMetric, 0, len(c.podMetrics))
+	for _, m := range c.podMetrics {
+		items = append(items, m.RawNetworkMetric)
+	}
+
+	batch := &pb.RawNetworkMetricBatch{Items: items}
+	batchBytes, err := proto.Marshal(batch)
+	if err != nil {
+		c.log.Errorf("marshal batch: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if _, err := w.Write(batchBytes); err != nil {
+		c.log.Errorf("write batch: %v", err)
+		return
 	}
 }
 
@@ -124,6 +145,9 @@ func (c *Collector) collect() error {
 		return fmt.Errorf("listing conntrack entries: %w", err)
 	}
 	metrics.SetConntrackActiveEntriesCount(float64(len(conns)))
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	for _, conn := range conns {
 		connKey := conntrackEntryKey(conn)
@@ -142,20 +166,26 @@ func (c *Collector) collect() error {
 
 		groupKey := entryGroupKey(conn)
 		if pm, found := c.podMetrics[groupKey]; found {
-			pm.TxBytes += txBytes
-			pm.TxPackets += txPackets
-			pm.RxBytes += rxBytes
-			pm.RxPackets += rxPackets
+			pm.TxBytes += int64(txBytes)
+			pm.TxPackets += int64(txPackets)
+			pm.RxBytes += int64(rxBytes)
+			pm.RxPackets += int64(rxPackets)
 			if conn.Lifetime.After(pm.lifetime) {
 				pm.lifetime = conn.Lifetime
 			}
 		} else {
-			pm, err := c.initNewPodNetworkMetric(conn)
-			if err != nil {
-				c.log.Warnf("initializing new pod network metric: %v", err)
-				continue
+			c.podMetrics[groupKey] = &rawNetworkMetric{
+				RawNetworkMetric: &pb.RawNetworkMetric{
+					SrcIp:     toIPint32(conn.Src.IP()),
+					DstIp:     toIPint32(conn.Dst.IP()),
+					TxBytes:   int64(conn.TxBytes),
+					TxPackets: int64(conn.TxPackets),
+					RxBytes:   int64(conn.RxBytes),
+					RxPackets: int64(conn.RxPackets),
+					Proto:     int32(conn.Proto),
+				},
+				lifetime: conn.Lifetime,
 			}
-			c.podMetrics[groupKey] = pm
 		}
 	}
 
@@ -163,93 +193,10 @@ func (c *Collector) collect() error {
 	return nil
 }
 
-func (c *Collector) initNewPodNetworkMetric(conn *conntrack.Entry) (*PodNetworkMetric, error) {
-	srcIPString := conn.Src.IP().String()
-	pod, err := c.kubeWatcher.GetPodByIP(srcIPString)
-	if err != nil {
-		return nil, fmt.Errorf("getting pod by ip %q: %w", srcIPString, err)
-	}
-	dstIPString := conn.Dst.IP().String()
-	metric := PodNetworkMetric{
-		SrcIP:        conn.Src.IP().String(),
-		SrcPod:       pod.Name,
-		SrcNamespace: pod.Namespace,
-		SrcNode:      pod.Spec.NodeName,
-		DstIP:        dstIPString,
-		DstIPType:    ipType(conn.Dst.IP()),
-		TxBytes:      conn.TxBytes,
-		TxPackets:    conn.TxPackets,
-		RxBytes:      conn.RxBytes,
-		RxPackets:    conn.RxPackets,
-		Proto:        conntrack.ProtoString(conn.Proto),
-		lifetime:     conn.Lifetime,
-	}
-
-	srcNode, err := c.kubeWatcher.GetNodeByName(pod.Spec.NodeName)
-	if err != nil && !errors.Is(err, kube.ErrNotFound) {
-		return nil, err
-	}
-	if srcNode != nil {
-		metric.SrcZone = getNodeZone(srcNode)
-	}
-
-	// Try to find destination pod and node info.
-	if conn.Dst.IP().IsPrivate() {
-		dstIP := dstIPString
-		// First try finding destination pod by ip.
-		dstPod, err := c.kubeWatcher.GetPodByIP(dstIP)
-		if err != nil && !errors.Is(err, kube.ErrNotFound) && !errors.Is(err, kube.ErrToManyObjects) {
-			return nil, err
-		}
-		if dstPod != nil {
-			metric.DstPod = dstPod.Name
-			metric.DstNamespace = dstPod.Namespace
-
-			// Also find destination node by name.
-			dstNode, err := c.kubeWatcher.GetNodeByName(dstPod.Spec.NodeName)
-			if err != nil && !errors.Is(err, kube.ErrNotFound) {
-				return nil, err
-			}
-			if dstNode != nil {
-				metric.DstNode = dstNode.Name
-				metric.DstZone = getNodeZone(dstNode)
-			}
-		} else {
-			// No destination pod found. But at least we can try finding destination node.
-			dstNode, err := c.kubeWatcher.GetNodeByIP(dstIP)
-			if err != nil && !errors.Is(err, kube.ErrNotFound) {
-				return nil, err
-			}
-			if dstNode != nil {
-				metric.DstNode = dstNode.Name
-				metric.DstZone = getNodeZone(dstNode)
-			}
-		}
-	}
-	return &metric, nil
-}
-
-func (c *Collector) export() {
-	start := time.Now()
-	ts := uint64(c.currentTimeGetter().UTC().UnixMilli())
-
-	metricsCount := 0
-	for _, metric := range c.podMetrics {
-		metric.TS = ts
-		select {
-		case c.metricsChan <- metric:
-			metricsCount++
-		default:
-			metrics.IncDroppedEvents()
-			c.log.Errorf("dropping metric event, channel is full. "+
-				"Consider increasing --metrics-buffer-size from current value: %d", c.cfg.MetricBufferSize)
-		}
-	}
-
-	c.log.Infof("flushed in %s, metrics=%d", time.Since(start), metricsCount)
-}
-
 func (c *Collector) cleanup() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	start := c.currentTimeGetter().UTC()
 	now := start
 	deletedEntriesCount := 0
@@ -273,7 +220,7 @@ func (c *Collector) cleanup() {
 }
 
 func (c *Collector) getNodePods() ([]*corev1.Pod, error) {
-	pods, err := c.kubeWatcher.GetPodsByNode(c.cfg.NodeName)
+	pods, err := c.podsWatcher.Get(c.cfg.NodeName)
 	if err != nil {
 		return nil, err
 	}
@@ -339,13 +286,7 @@ func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 	return res
 }
 
-func getNodeZone(node *corev1.Node) string {
-	return node.Labels["topology.kubernetes.io/zone"]
-}
-
-func ipType(ip netaddr.IP) string {
-	if ip.IsPrivate() {
-		return "private"
-	}
-	return "public"
+func toIPint32(ip netaddr.IP) int32 {
+	b := ip.As4()
+	return int32(binary.BigEndian.Uint32([]byte{b[0], b[1], b[2], b[3]}))
 }

@@ -51,27 +51,37 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Create the name of the service account to use
+Create the name of the service account for collector
 */}}
-{{- define "egressd.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "egressd.fullname" .) .Values.serviceAccount.name }}
+{{- define "egressd.collector.serviceAccountName" -}}
+{{- if .Values.collector.serviceAccount.create }}
+{{- default (include "egressd.fullname" .) .Values.collector.serviceAccount.name }}
 {{- else }}
-{{- default "default" .Values.serviceAccount.name }}
+{{- default "default" .Values.collector.serviceAccount.name }}
 {{- end }}
-{{- end }}
-
-
-{{- define "egressd.aggregator.fullname" -}}
-{{ include "egressd.fullname" . }}-aggregator
 {{- end }}
 
 {{/*
-Common aggregator labels
+Create the name of the service account for exporter
 */}}
-{{- define "egressd.aggregator.labels" -}}
+{{- define "egressd.exporter.serviceAccountName" -}}
+{{- if .Values.exporter.serviceAccount.create }}
+{{- default (include "egressd.exporter.fullname" .) .Values.exporter.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.exporter.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{- define "egressd.exporter.fullname" -}}
+{{ include "egressd.fullname" . }}-exporter
+{{- end }}
+
+{{/*
+Common exporter labels
+*/}}
+{{- define "egressd.exporter.labels" -}}
 helm.sh/chart: {{ include "egressd.chart" . }}
-{{ include "egressd.aggregator.selectorLabels" . }}
+{{ include "egressd.exporter.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -81,8 +91,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "egressd.aggregator.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "egressd.name" . }}-aggregator
+{{- define "egressd.exporter.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "egressd.name" . }}-exporter
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
@@ -90,7 +100,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Values.export.http.addr }}
 {{- .Values.export.http.addr}}
 {{- else }}
-{{- printf "http://%s:80" (include "egressd.aggregator.fullname" .) }}
+{{- printf "http://%s:80" (include "egressd.exporter.fullname" .) }}
 {{- end }}
 {{- end }}
 
@@ -98,6 +108,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Values.export.http.addr }}
 {{- .Values.export.http.addr}}
 {{- else }}
-{{- printf "%s:6000" (include "egressd.aggregator.fullname" .) }}
+{{- printf "%s:6000" (include "egressd.exporter.fullname" .) }}
 {{- end }}
 {{- end }}
