@@ -37,6 +37,7 @@ var (
 	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
 	dumpCT            = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
 	ciliumClockSource = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
+	groupPublicIPs    = flag.Bool("group-public-ips", false, "Group public ips destinations as 0.0.0.0")
 )
 
 // These should be set via `go build` during a release.
@@ -104,6 +105,7 @@ func run(log logrus.FieldLogger) error {
 		CleanupInterval:   *cleanupInterval,
 		NodeName:          os.Getenv("NODE_NAME"),
 		ExcludeNamespaces: *excludeNamespaces,
+		GroupPublicIPs:    *groupPublicIPs,
 	}
 	coll := collector.New(
 		cfg,

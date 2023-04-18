@@ -48,12 +48,12 @@ func TestHTTPSink(t *testing.T) {
 	expectedBatch := &pb.PodNetworkMetricBatch{
 		Items: []*pb.PodNetworkMetric{
 			{
-				SrcIp:        168691468,
+				SrcIp:        "10.10.2.14",
 				SrcPod:       "p1",
 				SrcNamespace: "team1",
 				SrcNode:      "n1",
 				SrcZone:      "us-east-1a",
-				DstIp:        168691461,
+				DstIp:        "10.10.2.15",
 				DstPod:       "p2",
 				DstNamespace: "team2",
 				DstNode:      "n1",

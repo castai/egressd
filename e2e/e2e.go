@@ -162,10 +162,10 @@ func (m *mockAPI) assertMetricsReceived(ctx context.Context) error {
 				continue
 			}
 			logEntry := logs[0]
-			if logEntry.SrcIp == 0 {
+			if logEntry.SrcIp == "" {
 				return errors.New("source ip is missing")
 			}
-			if logEntry.DstIp == 0 {
+			if logEntry.DstIp == "" {
 				return errors.New("dest ip is missing")
 			}
 			return nil

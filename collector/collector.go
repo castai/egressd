@@ -35,6 +35,8 @@ type Config struct {
 	NodeName string
 	// ExcludeNamespaces allows to exclude namespaces. Input is comma separated string.
 	ExcludeNamespaces string
+	// GroupPublicIPs will group all public destinations under single 0.0.0.0 IP.
+	GroupPublicIPs bool
 }
 
 type podsWatcher interface {
@@ -150,6 +152,9 @@ func (c *Collector) collect() error {
 	defer c.mu.Unlock()
 
 	for _, conn := range conns {
+		if c.cfg.GroupPublicIPs && !conn.Dst.IP().IsPrivate() {
+			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
+		}
 		connKey := conntrackEntryKey(conn)
 		txBytes := conn.TxBytes
 		txPackets := conn.TxPackets

@@ -17,12 +17,12 @@ message RawNetworkMetricBatch {
 }
 
 message PodNetworkMetric {
-  int32 src_ip = 1;
+  string src_ip = 1;
   string src_pod = 2;
   string src_namespace = 3;
   string src_node = 4;
   string src_zone = 6;
-  int32 dst_ip = 7;
+  string dst_ip = 7;
   string dst_pod = 8;
   string dst_namespace = 9;
   string dst_node = 10;
