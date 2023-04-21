@@ -2,7 +2,7 @@
 
 Kubernetes aware network traffic monitoring.
 
-## How it works
+### How it works
 
 * DaemonSet pod starts on each node.
 * Conntrack entries are fetched for pods running on each at configured interval (5 seconds by default).
@@ -12,16 +12,18 @@ Kubernetes aware network traffic monitoring.
 * Kubernetes context is added including source and destination pods, nodes, node zones, ips.
 * Exporter can export logs to http or prometheus.
 
-## Install
+### Install
 
-```sh
-helm repo add castai-helm https://castai.github.io/helm-charts
-helm repo update castai-helm
-
-helm upgrade --install castai-egressd castai-helm/egressd -n castai-agent \
-  --set castai.apiKey=<your-api-token> \
-  --set castai.clusterID=<your-cluster-id>
+**Install demo with preconfigured grafana and prometheus metrics.**
 ```
+curl -fsSL https://raw.githubusercontent.com/castai/egressd/master/demo.sh | bash
+```
+
+**Expose grafana locally**
+```sh
+ kubectl port-forward svc/egressd-grafana 8080:80 -n egressd
+```
+Example dashboard available at http://localhost:8080/d/egressd/egressd
 
 ### Development
 

@@ -1,0 +1,18 @@
+collector:
+  extraArgs:
+    group-public-ips: true # Set this to false if you want to see all public ips destinations.
+
+#See docs for actual url depending on your metrics component:
+#  * Mimir https://grafana.com/docs/mimir/latest/references/http-api/#remote-write
+#  * Cortex https://cortexmetrics.io/docs/api/#remote-write
+#  * Prometheus https://prometheus.io/docs/prometheus/latest/storage/#overview
+#  * Victoria Metrics https://docs.victoriametrics.com/vmagent.html#how-to-push-data-to-vmagent
+exporter:
+  config: |
+    exportInterval: 15s
+    sinks:
+      prom_sink:
+        prom_remote_write:
+          url: "http://egressd-victoria:8428/api/v1/write"
+          headers:
+            My-Optional-Header: my-header-value
