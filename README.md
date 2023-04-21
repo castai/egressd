@@ -26,6 +26,13 @@ curl -fsSL https://raw.githubusercontent.com/castai/egressd/master/demo.sh | bas
 Example dashboard available at http://localhost:8080/d/egressd/egressd
 Metrics should be visible after few minutes.
 
+**(Optionally) Install demo onlineboutique eshop**
+
+If you want to test egressd on empty cluster.
+```sh
+helm upgrade --install onlineboutique oci://us-docker.pkg.dev/online-boutique-ci/charts/onlineboutique -n demo --create-namespace
+```
+
 ### Development
 
 Start all components + test grafana,promtheus in tilt local k8s cluster.
