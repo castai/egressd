@@ -24,6 +24,7 @@ curl -fsSL https://raw.githubusercontent.com/castai/egressd/master/demo.sh | bas
  kubectl port-forward svc/egressd-grafana 8080:80 -n egressd
 ```
 Example dashboard available at http://localhost:8080/d/egressd/egressd
+Metrics should be visible after few minutes.
 
 ### Development
 
