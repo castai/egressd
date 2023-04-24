@@ -12,6 +12,7 @@ Kubernetes aware network traffic monitoring.
 * Kubernetes context is added including source and destination pods, nodes, node zones, ips.
 * Exporter can export logs to http or prometheus.
 
+
 ### Install
 
 **Install demo with preconfigured grafana and prometheus metrics.**
@@ -25,6 +26,9 @@ curl -fsSL https://raw.githubusercontent.com/castai/egressd/master/demo.sh | bas
 ```
 Example dashboard available at http://localhost:8080/d/egressd/egressd
 Metrics should be visible after few minutes.
+
+![Dashboard](https://raw.githubusercontent.com/castai/egressd/main/egress.png)
+
 
 **(Optionally) Install demo onlineboutique eshop**
 
