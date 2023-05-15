@@ -133,6 +133,51 @@ func TestCollector(t *testing.T) {
 		}, items[1])
 	})
 
+	t.Run("multiple collect with tx/rx bytes lower for new entries", func(t *testing.T) {
+		r := require.New(t)
+
+		// Initially conntrack entries.
+		initialEntries := []conntrack.Entry{
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+				TxBytes:   20,
+				TxPackets: 2,
+				Proto:     6,
+			},
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.4:3001"),
+				RxBytes:   10,
+				RxPackets: 1,
+				Proto:     6,
+			},
+		}
+
+		connTracker := &mockConntrack{
+			entries: initialEntries,
+		}
+
+		coll := newCollector(connTracker)
+
+		// Collect first time.
+		r.NoError(coll.collect())
+
+		// Update tx stats.
+		initialEntries[0].TxBytes = 5
+
+		// Add rx stats.
+		initialEntries[1].RxBytes = 1
+		r.NoError(coll.collect())
+
+		metrics := lo.Values(coll.podMetrics)
+		// Check TxBytes stay the same
+		r.EqualValues(20, metrics[0].TxBytes)
+
+		// Check RxBytes stay the same
+		r.EqualValues(10, metrics[1].RxBytes)
+	})
+
 	t.Run("group public ips", func(t *testing.T) {
 		r := require.New(t)
 

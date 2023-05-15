@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"inet.af/netaddr"
@@ -162,9 +163,11 @@ func (c *Collector) collect() error {
 		rxPackets := conn.RxPackets
 
 		if cachedConn, found := c.entriesCache[connKey]; found {
-			txBytes -= cachedConn.TxBytes
+			// TODO: REP-243: there is known issue that current tx/rx bytes could be lower than previously scrapped values,
+			// so treat it as 0 delta to avoid random values for uint64
+			txBytes = lo.Ternary(txBytes < cachedConn.TxBytes, 0, txBytes-cachedConn.TxBytes)
+			rxBytes = lo.Ternary(rxBytes < cachedConn.RxBytes, 0, rxBytes-cachedConn.RxBytes)
 			txPackets -= cachedConn.TxPackets
-			rxBytes -= cachedConn.RxBytes
 			rxPackets -= cachedConn.RxPackets
 		}
 		c.entriesCache[connKey] = conn
