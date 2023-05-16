@@ -99,7 +99,7 @@ func (n *netfilterClient) ListEntries(filter EntriesFilter) ([]*Entry, error) {
 			TxBytes:   entry.RxBytes,
 			TxPackets: entry.RxPackets,
 			RxBytes:   entry.TxBytes,
-			RxPackets: entry.RxPackets,
+			RxPackets: entry.TxPackets,
 			Proto:     entry.Proto,
 			Lifetime:  entry.Lifetime,
 		}

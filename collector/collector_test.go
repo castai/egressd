@@ -133,6 +133,64 @@ func TestCollector(t *testing.T) {
 		}, items[1])
 	})
 
+	t.Run("multiple collect with tx/rx bytes lower for new entries", func(t *testing.T) {
+		r := require.New(t)
+
+		// Initially conntrack entries.
+		initialEntries := []conntrack.Entry{
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+				TxBytes:   20,
+				TxPackets: 3,
+				Proto:     6,
+			},
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.4:3001"),
+				RxBytes:   10,
+				RxPackets: 2,
+				Proto:     6,
+			},
+		}
+
+		connTracker := &mockConntrack{
+			entries: initialEntries,
+		}
+
+		coll := newCollector(connTracker)
+
+		// Collect first time.
+		r.NoError(coll.collect())
+
+		key1 := entryGroupKey(&initialEntries[0])
+		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
+		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
+
+		key2 := entryGroupKey(&initialEntries[1])
+		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
+		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
+
+		// Update tx stats.
+		initialEntries[0].TxBytes = 5
+		initialEntries[0].TxPackets = 2
+
+		// Update rx stats.
+		initialEntries[1].RxBytes = 1
+		initialEntries[1].RxPackets = 1
+		r.NoError(coll.collect())
+
+		// Check TxBytes stay the same
+		key1 = entryGroupKey(&initialEntries[0])
+		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
+		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
+
+		// Check RxBytes stay the same
+		key2 = entryGroupKey(&initialEntries[1])
+		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
+		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
+	})
+
 	t.Run("group public ips", func(t *testing.T) {
 		r := require.New(t)
 
