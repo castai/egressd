@@ -167,8 +167,8 @@ func (c *Collector) collect() error {
 			// so treat it as 0 delta to avoid random values for uint64
 			txBytes = lo.Ternary(txBytes < cachedConn.TxBytes, 0, txBytes-cachedConn.TxBytes)
 			rxBytes = lo.Ternary(rxBytes < cachedConn.RxBytes, 0, rxBytes-cachedConn.RxBytes)
-			txPackets -= cachedConn.TxPackets
-			rxPackets -= cachedConn.RxPackets
+			txPackets = lo.Ternary(txPackets < cachedConn.TxPackets, 0, txPackets-cachedConn.TxPackets)
+			rxPackets = lo.Ternary(rxPackets < cachedConn.RxPackets, 0, rxPackets-cachedConn.RxPackets)
 		}
 		c.entriesCache[connKey] = conn
 
