@@ -138,7 +138,7 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 		return
 	}
 	if c.cfg.SendTrafficDelta {
-		// reset metric tx/rx values, so only delta numbers will be sent
+		// reset metric tx/rx values, so only delta numbers will be sent with the next batch
 		for _, m := range c.podMetrics {
 			m.RawNetworkMetric.TxBytes = 0
 			m.RawNetworkMetric.RxBytes = 0

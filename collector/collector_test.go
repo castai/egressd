@@ -1,6 +1,8 @@
 package collector
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"sort"
 	"strconv"
 	"testing"
@@ -9,6 +11,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -336,6 +339,197 @@ func TestCollector(t *testing.T) {
 		r.Len(entries, 1)
 		r.Len(metrics, 1)
 	})
+}
+
+func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
+
+	kubeWatcher := &mockKubeWatcher{
+		pods: []*corev1.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "p1",
+					Namespace: "team1",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "n1",
+				},
+				Status: corev1.PodStatus{
+					PodIP: "10.14.7.12",
+				},
+			},
+		},
+	}
+
+	newCollector := func(connTracker conntrack.Client) *Collector {
+		return New(Config{
+			ReadInterval:    time.Millisecond,
+			CleanupInterval: 3 * time.Millisecond,
+			NodeName:        "n1",
+		}, log,
+			kubeWatcher,
+			connTracker,
+			mockTimeGetter,
+		)
+	}
+
+	t.Run("metric tx/rx values should be constantly growing counter value when SendTrafficDelta option is false", func(t *testing.T) {
+		r := require.New(t)
+
+		// Initially conntrack entries.
+		initialEntries := []conntrack.Entry{
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+				TxBytes:   20,
+				TxPackets: 3,
+				Proto:     6,
+			},
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.4:3001"),
+				RxBytes:   10,
+				RxPackets: 2,
+				Proto:     6,
+			},
+		}
+
+		connTracker := &mockConntrack{entries: initialEntries}
+
+		coll := newCollector(connTracker)
+		coll.cfg.SendTrafficDelta = false
+
+		// Collect first time.
+		r.NoError(coll.collect())
+
+		key1 := entryGroupKey(&initialEntries[0])
+		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
+		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
+
+		key2 := entryGroupKey(&initialEntries[1])
+		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
+		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
+
+		initialEntries[0].TxBytes += 10
+		initialEntries[0].TxPackets += 2
+		initialEntries[1].RxBytes += 5
+		initialEntries[1].RxPackets += 1
+		r.NoError(coll.collect())
+
+		// Check values are growing
+		r.EqualValues(30, coll.podMetrics[key1].TxBytes)
+		r.EqualValues(5, coll.podMetrics[key1].TxPackets)
+		r.EqualValues(15, coll.podMetrics[key2].RxBytes)
+		r.EqualValues(3, coll.podMetrics[key2].RxPackets)
+
+		w := httptest.NewRecorder()
+		// scrape pods metrics and prepare them to be sent
+		coll.GetRawNetworkMetricsHandler(w, &http.Request{})
+		r.Equal(200, w.Code)
+
+		batch := &pb.RawNetworkMetricBatch{}
+		err := proto.Unmarshal(w.Body.Bytes(), batch)
+		r.NoError(err)
+		r.Len(batch.Items, 2)
+
+		// Check values are the same as on the last collecting action
+		r.EqualValues(30, batch.Items[0].TxBytes)
+		r.EqualValues(5, batch.Items[0].TxPackets)
+		r.EqualValues(15, batch.Items[1].RxBytes)
+		r.EqualValues(3, batch.Items[1].RxPackets)
+
+		initialEntries[0].TxBytes += 10
+		initialEntries[0].TxPackets += 2
+		initialEntries[1].RxBytes += 5
+		initialEntries[1].RxPackets += 1
+		r.NoError(coll.collect())
+
+		// Check values are growing
+		r.EqualValues(40, coll.podMetrics[key1].TxBytes)
+		r.EqualValues(7, coll.podMetrics[key1].TxPackets)
+		r.EqualValues(20, coll.podMetrics[key2].RxBytes)
+		r.EqualValues(4, coll.podMetrics[key2].RxPackets)
+	})
+
+	t.Run("metric tx/rx values should be reset when SendTrafficDelta option is true", func(t *testing.T) {
+		r := require.New(t)
+
+		// Initially conntrack entries.
+		initialEntries := []conntrack.Entry{
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+				TxBytes:   20,
+				TxPackets: 3,
+				Proto:     6,
+			},
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.4:3001"),
+				RxBytes:   10,
+				RxPackets: 2,
+				Proto:     6,
+			},
+		}
+
+		connTracker := &mockConntrack{entries: initialEntries}
+
+		coll := newCollector(connTracker)
+		coll.cfg.SendTrafficDelta = true
+
+		// Collect first time.
+		r.NoError(coll.collect())
+
+		key1 := entryGroupKey(&initialEntries[0])
+		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
+		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
+
+		key2 := entryGroupKey(&initialEntries[1])
+		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
+		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
+
+		initialEntries[0].TxBytes += 10
+		initialEntries[0].TxPackets += 2
+		initialEntries[1].RxBytes += 5
+		initialEntries[1].RxPackets += 1
+		r.NoError(coll.collect())
+
+		// Check values are growing
+		r.EqualValues(30, coll.podMetrics[key1].TxBytes)
+		r.EqualValues(5, coll.podMetrics[key1].TxPackets)
+		r.EqualValues(15, coll.podMetrics[key2].RxBytes)
+		r.EqualValues(3, coll.podMetrics[key2].RxPackets)
+
+		w := httptest.NewRecorder()
+		// scrape pods metrics and prepare them to be sent
+		coll.GetRawNetworkMetricsHandler(w, &http.Request{})
+		r.Equal(200, w.Code)
+
+		batch := &pb.RawNetworkMetricBatch{}
+		err := proto.Unmarshal(w.Body.Bytes(), batch)
+		r.NoError(err)
+		r.Len(batch.Items, 2)
+
+		// Check values are the same as on the last collecting action
+		r.EqualValues(30, batch.Items[0].TxBytes)
+		r.EqualValues(5, batch.Items[0].TxPackets)
+		r.EqualValues(15, batch.Items[1].RxBytes)
+		r.EqualValues(3, batch.Items[1].RxPackets)
+
+		initialEntries[0].TxBytes += 10
+		initialEntries[0].TxPackets += 2
+		initialEntries[1].RxBytes += 5
+		initialEntries[1].RxPackets += 1
+		r.NoError(coll.collect())
+
+		// Check values are reset
+		r.EqualValues(10, coll.podMetrics[key1].TxBytes)
+		r.EqualValues(2, coll.podMetrics[key1].TxPackets)
+		r.EqualValues(5, coll.podMetrics[key2].RxBytes)
+		r.EqualValues(1, coll.podMetrics[key2].RxPackets)
+	})
+
 }
 
 func BenchmarkCollector(b *testing.B) {
