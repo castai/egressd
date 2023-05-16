@@ -72,6 +72,7 @@ collector:
   # Extra args for egressd collector container.
   extraArgs:
     group-public-ips: true
+    send-traffic-delta: true
 
   prometheusScrape:
     enabled: true
