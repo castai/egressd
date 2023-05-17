@@ -38,6 +38,7 @@ var (
 	dumpCT            = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
 	ciliumClockSource = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
 	groupPublicIPs    = flag.Bool("group-public-ips", false, "Group public ips destinations as 0.0.0.0")
+	sendTrafficDelta  = flag.Bool("send-traffic-delta", false, "Send traffic delta between reads of conntrack entry. Traffic counter is sent by default")
 )
 
 // These should be set via `go build` during a release.
@@ -106,6 +107,7 @@ func run(log logrus.FieldLogger) error {
 		NodeName:          os.Getenv("NODE_NAME"),
 		ExcludeNamespaces: *excludeNamespaces,
 		GroupPublicIPs:    *groupPublicIPs,
+		SendTrafficDelta:  *sendTrafficDelta,
 	}
 	coll := collector.New(
 		cfg,

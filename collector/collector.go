@@ -38,6 +38,9 @@ type Config struct {
 	ExcludeNamespaces string
 	// GroupPublicIPs will group all public destinations under single 0.0.0.0 IP.
 	GroupPublicIPs bool
+	// SendTrafficDelta used to determines if traffic should be sent as delta of 2 consecutive conntrack entries
+	// or as the constantly growing counter value
+	SendTrafficDelta bool
 }
 
 type podsWatcher interface {
@@ -134,6 +137,15 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 		c.log.Errorf("write batch: %v", err)
 		return
 	}
+	if c.cfg.SendTrafficDelta {
+		// reset metric tx/rx values, so only delta numbers will be sent with the next batch
+		for _, m := range c.podMetrics {
+			m.RawNetworkMetric.TxBytes = 0
+			m.RawNetworkMetric.RxBytes = 0
+			m.RawNetworkMetric.TxPackets = 0
+			m.RawNetworkMetric.RxPackets = 0
+		}
+	}
 }
 
 // collect aggregates conntract records into reduced pod metrics.
@@ -163,7 +175,7 @@ func (c *Collector) collect() error {
 		rxPackets := conn.RxPackets
 
 		if cachedConn, found := c.entriesCache[connKey]; found {
-			// TODO: REP-243: there is known issue that current tx/rx bytes could be lower than previously scrapped values,
+			// NOTE: REP-243: there is known issue that current tx/rx bytes could be lower than previously scrapped values,
 			// so treat it as 0 delta to avoid random values for uint64
 			txBytes = lo.Ternary(txBytes < cachedConn.TxBytes, 0, txBytes-cachedConn.TxBytes)
 			rxBytes = lo.Ternary(rxBytes < cachedConn.RxBytes, 0, rxBytes-cachedConn.RxBytes)
