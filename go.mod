@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/castai/promwrite v0.5.0
 	github.com/cilium/cilium v1.12.4
+	github.com/cilium/ebpf v0.10.0
 	github.com/florianl/go-conntrack v0.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -29,7 +30,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cilium/ebpf v0.10.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect

@@ -8,6 +8,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y linux-headers-generic && \
     apt-get install -y libelf-dev && \
     apt-get install -y zlib1g-dev && \
+    apt-get install -y iptables && \
     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 140 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-14 --slave /usr/bin/llc llc /usr/bin/llc-14 --slave /usr/bin/clang-format clang-format /usr/bin/clang-format-14 --slave /usr/bin/clangd clangd /usr/bin/clangd-14
 
 ARG TARGETARCH
@@ -16,6 +17,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     tar -C /usr/local -xzf /tmp/golang.tar.xz && \
     update-alternatives --install /usr/bin/go go /usr/local/go/bin/go 1
 
+
 RUN export PATH=$PATH:/usr/bin
+VOLUME /var/lib/containerd
 ENV HOME /home
 WORKDIR /home/app

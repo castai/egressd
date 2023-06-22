@@ -1,0 +1,1 @@
+#define statfunc static __always_inline
