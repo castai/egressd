@@ -54,15 +54,14 @@ type bpfSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfProgramSpecs struct {
-	CountEgressPackets *ebpf.ProgramSpec `ebpf:"count_egress_packets"`
+	CgroupIngress *ebpf.ProgramSpec `ebpf:"cgroup_ingress"`
 }
 
 // bpfMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	Events   *ebpf.MapSpec `ebpf:"events"`
-	PktCount *ebpf.MapSpec `ebpf:"pkt_count"`
+	Events *ebpf.MapSpec `ebpf:"events"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -84,14 +83,12 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	Events   *ebpf.Map `ebpf:"events"`
-	PktCount *ebpf.Map `ebpf:"pkt_count"`
+	Events *ebpf.Map `ebpf:"events"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
 		m.Events,
-		m.PktCount,
 	)
 }
 
@@ -99,12 +96,12 @@ func (m *bpfMaps) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfPrograms struct {
-	CountEgressPackets *ebpf.Program `ebpf:"count_egress_packets"`
+	CgroupIngress *ebpf.Program `ebpf:"cgroup_ingress"`
 }
 
 func (p *bpfPrograms) Close() error {
 	return _BpfClose(
-		p.CountEgressPackets,
+		p.CgroupIngress,
 	)
 }
 

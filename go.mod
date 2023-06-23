@@ -7,6 +7,7 @@ require (
 	github.com/cilium/cilium v1.12.4
 	github.com/cilium/ebpf v0.10.0
 	github.com/florianl/go-conntrack v0.3.0
+	github.com/google/gopacket v1.1.19
 	github.com/gorilla/mux v1.8.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/prometheus/client_golang v1.13.1

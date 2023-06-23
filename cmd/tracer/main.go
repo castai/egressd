@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 
@@ -10,21 +11,7 @@ import (
 	"github.com/castai/egressd/ebpf"
 )
 
-/*
-curl -L -O https://github.com/containerd/containerd/releases/download/v1.7.2/containerd-1.7.2-linux-amd64.tar.gz
-tar Cxzvf /usr/local ./containerd-1.7.2-linux-amd64.tar.gz
-curl -L -O https://github.com/opencontainers/runc/releases/download/v1.1.7/runc.amd64
-install -m 755 runc.amd64 /usr/local/sbin/runc
-
-curl -O -L https://github.com/containerd/nerdctl/releases/download/v1.4.0/nerdctl-1.4.0-linux-amd64.tar.gz
-tar Cxzvf /usr/local/bin ./nerdctl-1.4.0-linux-amd64.tar.gz
-
-curl -O -L https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz
-mkdir -p /opt/cni/bin
-tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.3.0.tgz
-
-nerdctl run -d -p 8080:80 --name nginx nginx:alpine
-*/
+// This is example program for ebpf dns tracer.
 func main() {
 	ctx := context.Background()
 	log := logrus.New()
@@ -33,8 +20,23 @@ func main() {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
-	tr := ebpf.NewTracer(log)
-	if err := tr.Run(ctx); err != nil {
-		log.Fatalf("failed: %v", err)
+	tr := ebpf.NewTracer(log, ebpf.Config{
+		QueueSize: 1000,
+		// Custom path should be used only for testing purposes in case there is no btf (local docker).
+		// In prod do not set this and enable tracer only if ebpf.IsKernelBTFAvailable returns true.
+		CustomBTFFilePath: "/app/cmd/tracer/5.8.0-63-generic.btf",
+	})
+	errc := make(chan error, 1)
+	go func() {
+		errc <- tr.Run(ctx)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return
+	case e := <-tr.Events():
+		fmt.Println(e)
+	case err := <-errc:
+		log.Error(err)
 	}
 }

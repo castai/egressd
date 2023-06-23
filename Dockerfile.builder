@@ -9,6 +9,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y libelf-dev && \
     apt-get install -y zlib1g-dev && \
     apt-get install -y iptables && \
+    apt-get install -y tcpdump && \
     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 140 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-14 --slave /usr/bin/llc llc /usr/bin/llc-14 --slave /usr/bin/clang-format clang-format /usr/bin/clang-format-14 --slave /usr/bin/clangd clangd /usr/bin/clangd-14
 
 ARG TARGETARCH

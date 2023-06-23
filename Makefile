@@ -34,7 +34,7 @@ endif
 
 BPF_CFLAGS='-D__TARGET_ARCH_x86'
 
-CMD_DOCKER_BUILDER=docker run --rm -it \
+CMD_DOCKER_BUILDER=docker run --rm -it --name egressd-ebpf-builder \
 	-v $$(pwd)/.cache/go-build:/home/.cache/go-build \
 	-v $$(pwd)/.cache/go-mod:/home/go/pkg/mod \
 	-v $$(pwd):/app --privileged \

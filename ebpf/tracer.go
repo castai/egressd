@@ -7,22 +7,37 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/sirupsen/logrus"
 )
 
-func NewTracer(log logrus.FieldLogger) *Tracer {
-	return &Tracer{log: log}
+type Config struct {
+	QueueSize         int
+	CustomBTFFilePath string
+}
+
+func NewTracer(log logrus.FieldLogger, cfg Config) *Tracer {
+	if cfg.QueueSize == 0 {
+		cfg.QueueSize = 1000
+	}
+	return &Tracer{
+		log:    log.WithField("component", "ebpf_tracer"),
+		cfg:    cfg,
+		events: make(chan DNSEvent, cfg.QueueSize),
+	}
 }
 
 type Tracer struct {
-	log logrus.FieldLogger
+	log    logrus.FieldLogger
+	cfg    Config
+	events chan DNSEvent
 }
 
 func (t *Tracer) Run(ctx context.Context) error {
@@ -31,20 +46,21 @@ func (t *Tracer) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Load pre-compiled programs and maps into the kernel.
+	t.log.Debug("running")
+	defer t.log.Debug("stopping")
+
 	objs := bpfObjects{}
 	var customBTF *btf.Spec
-	if _, err := os.Stat("/sys/kernel/btf/vmlinux"); errors.Is(err, os.ErrNotExist) {
-		t.log.Warnf("btf file not found at /sys/kernel/btf/vmlinux, will load custom which may not work correctly")
-		// TODO: Load btpf specific to actual kernel version.
-		//btf, err := os.Open("/app/btfs/5.4.0-96-generic.btf")
-		spec, err := btf.LoadSpec("/app/cmd/tracer/5.8.0-63-generic.btf")
+	if t.cfg.CustomBTFFilePath != "" {
+		t.log.Debugf("loading custom btf from path %q", t.cfg.CustomBTFFilePath)
+		spec, err := btf.LoadSpec(t.cfg.CustomBTFFilePath)
 		if err != nil {
 			return err
 		}
 		customBTF = spec
 	}
 
+	// Load pre-compiled programs and maps into the kernel.
 	if err := loadBpfObjects(&objs, &ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{},
 		Programs: ebpf.ProgramOptions{
@@ -52,7 +68,7 @@ func (t *Tracer) Run(ctx context.Context) error {
 		},
 		MapReplacements: nil,
 	}); err != nil {
-		return fmt.Errorf("loading objects: %v", err)
+		return fmt.Errorf("loading objects: %w", err)
 	}
 	defer objs.Close()
 
@@ -62,23 +78,15 @@ func (t *Tracer) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Link the count_egress_packets program to the cgroup.
 	l, err := link.AttachCgroup(link.CgroupOptions{
 		Path:    cgroupPath,
-		Attach:  ebpf.AttachCGroupInetEgress,
-		Program: objs.CountEgressPackets,
+		Attach:  ebpf.AttachCGroupInetIngress,
+		Program: objs.CgroupIngress,
 	})
 	if err != nil {
 		return err
 	}
 	defer l.Close()
-
-	t.log.Println("Counting packets...")
-
-	// Read loop reporting the total amount of times the kernel
-	// function was entered, once per second.
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
 
 	reader, err := perf.NewReader(objs.Events, 1024)
 	if err != nil {
@@ -96,21 +104,58 @@ func (t *Tracer) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(record.RawSample)
+
+		// First 4 bytes now reserved for payload size. See net_event_context in types.h for full structure.
+		event, err := parseEvent(record.RawSample[4:])
+		if err != nil {
+			t.log.Errorf("parsing event: %v", err)
+			continue
+		}
+
+		select {
+		case t.events <- event:
+		default:
+			t.log.Warn("dropping event, queue is full")
+			continue
+		}
 	}
-	//
-	//for {
-	//	select {
-	//	case <-ctx.Done():
-	//		return ctx.Err()
-	//	case <-ticker.C:
-	//		var value uint64
-	//		if err := objs.PktCount.Lookup(uint32(0), &value); err != nil {
-	//			return err
-	//		}
-	//		log.Printf("number of packets: %d\n", value)
-	//	}
-	//}
+}
+
+func (t *Tracer) Events() <-chan DNSEvent {
+	return t.events
+}
+
+func IsKernelBTFAvailable() bool {
+	_, err := os.Stat("/sys/kernel/btf/vmlinux")
+	return err == nil
+}
+
+func parseEvent(data []byte) (DNSEvent, error) {
+	packet := gopacket.NewPacket(
+		data,
+		layers.LayerTypeIPv4,
+		gopacket.Default,
+	)
+
+	var res DNSEvent
+	if packet == nil {
+		return res, errors.New("parsing packet")
+	}
+
+	appLayer := packet.ApplicationLayer()
+	if appLayer == nil {
+		return res, errors.New("layer L7 is missing")
+	}
+
+	dns, ok := appLayer.(*layers.DNS)
+	if !ok {
+		return res, fmt.Errorf("expected dns layer, actual type %T", appLayer)
+	}
+
+	return DNSEvent{
+		Questions: dns.Questions,
+		Answers:   dns.Answers,
+	}, nil
 }
 
 func detectCgroupPath() (string, error) {
@@ -122,7 +167,6 @@ func detectCgroupPath() (string, error) {
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		// example fields: cgroup2 /sys/fs/cgroup/unified cgroup2 rw,nosuid,nodev,noexec,relatime 0 0
 		fields := strings.Split(scanner.Text(), " ")
 		if len(fields) >= 3 && fields[2] == "cgroup2" {
 			return fields[1], nil
