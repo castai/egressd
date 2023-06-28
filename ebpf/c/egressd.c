@@ -62,6 +62,7 @@ statfunc u32 cgroup_skb_generic(struct __sk_buff *ctx)
     switch (nethdrs->iphdrs.iphdr.protocol) {
         case IPPROTO_UDP:
             break;
+        // TODO: Add support for DNS over TCP.
         default:
             return 1;
     }
