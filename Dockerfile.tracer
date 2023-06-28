@@ -1,0 +1,3 @@
+FROM gcr.io/distroless/static-debian11
+COPY ./bin/egressd-tracer /usr/local/bin/egressd-tracer
+ENTRYPOINT ["/usr/local/bin/egressd-tracer"]

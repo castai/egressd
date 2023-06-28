@@ -48,6 +48,13 @@ jobs:
           GOOS: linux
           GOARCH: amd64
           CGO_ENABLED: 0
+          
+      - name: Build egressd tracer go binary
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd-tracer ./cmd/tracer
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: 0
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
@@ -75,6 +82,16 @@ jobs:
           tags: |
             ghcr.io/castai/egressd/egressd-exporter:${{ env.RELEASE_TAG }}
             ghcr.io/castai/egressd/egressd-exporter:latest
+            
+      - name: Build and push release (egressd tracer)
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          file: ./Dockerfile.tracer
+          tags: |
+            ghcr.io/castai/egressd/egressd-tracer:${{ env.RELEASE_TAG }}
+            ghcr.io/castai/egressd/egressd-tracer:latest
 
   release_chart:
     name: Release Helm Chart
