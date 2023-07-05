@@ -14,7 +14,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/exporter-configmap.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/exporter/configmap.yaml") . | sha256sum }}
       {{- if .Values.exporter.prometheusScrape.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{.Values.exporter.httpListenPort}}"
@@ -25,6 +25,10 @@ spec:
       labels:
         {{- include "egressd.exporter.labels" . | nindent 8 }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "egressd.exporter.serviceAccountName" . }}
       dnsPolicy: {{.Values.collector.dnsPolicy}}
       securityContext:
