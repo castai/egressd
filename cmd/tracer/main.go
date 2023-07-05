@@ -34,8 +34,13 @@ func main() {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Infof("context done: %v", ctx.Err())
 			return
-		case e := <-tr.Events():
+		case e, ok := <-tr.Events():
+			if !ok {
+				log.Info("events channel closed")
+				return
+			}
 			fmt.Println(e)
 		case err := <-errc:
 			log.Error(err)

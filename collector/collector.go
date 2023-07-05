@@ -52,11 +52,14 @@ type rawNetworkMetric struct {
 	lifetime time.Time
 }
 
+type ipLookup interface{ Lookup(netaddr.IP) string }
+
 func New(
 	cfg Config,
 	log logrus.FieldLogger,
 	podsWatcher podsWatcher,
 	conntracker conntrack.Client,
+	ip2dns ipLookup,
 	currentTimeGetter func() time.Time,
 ) *Collector {
 	excludeNsMap := map[string]struct{}{}
@@ -78,6 +81,7 @@ func New(
 		log:               log,
 		podsWatcher:       podsWatcher,
 		conntracker:       conntracker,
+		ip2dns:            ip2dns,
 		entriesCache:      make(map[uint64]*conntrack.Entry),
 		podMetrics:        map[uint64]*rawNetworkMetric{},
 		excludeNsMap:      excludeNsMap,
@@ -91,6 +95,7 @@ type Collector struct {
 	log               logrus.FieldLogger
 	podsWatcher       podsWatcher
 	conntracker       conntrack.Client
+	ip2dns            ipLookup
 	entriesCache      map[uint64]*conntrack.Entry
 	podMetrics        map[uint64]*rawNetworkMetric
 	excludeNsMap      map[string]struct{}
@@ -185,7 +190,12 @@ func (c *Collector) collect() error {
 		c.entriesCache[connKey] = conn
 
 		groupKey := entryGroupKey(conn)
+		srcName := c.ip2dns.Lookup(conn.Src.IP())
+		dstName := c.ip2dns.Lookup(conn.Dst.IP())
 		if pm, found := c.podMetrics[groupKey]; found {
+			pm.SrcDnsName = srcName
+			pm.DstDnsName = dstName
+
 			pm.TxBytes += int64(txBytes)
 			pm.TxPackets += int64(txPackets)
 			pm.RxBytes += int64(rxBytes)
@@ -196,13 +206,15 @@ func (c *Collector) collect() error {
 		} else {
 			c.podMetrics[groupKey] = &rawNetworkMetric{
 				RawNetworkMetric: &pb.RawNetworkMetric{
-					SrcIp:     toIPint32(conn.Src.IP()),
-					DstIp:     toIPint32(conn.Dst.IP()),
-					TxBytes:   int64(conn.TxBytes),
-					TxPackets: int64(conn.TxPackets),
-					RxBytes:   int64(conn.RxBytes),
-					RxPackets: int64(conn.RxPackets),
-					Proto:     int32(conn.Proto),
+					SrcDnsName: srcName,
+					DstDnsName: dstName,
+					SrcIp:      toIPint32(conn.Src.IP()),
+					DstIp:      toIPint32(conn.Dst.IP()),
+					TxBytes:    int64(conn.TxBytes),
+					TxPackets:  int64(conn.TxPackets),
+					RxBytes:    int64(conn.RxBytes),
+					RxPackets:  int64(conn.RxPackets),
+					Proto:      int32(conn.Proto),
 				},
 				lifetime: conn.Lifetime,
 			}

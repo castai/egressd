@@ -12,11 +12,21 @@ allow_k8s_contexts(['tilt', 'kind-tilt', 'docker-desktop', 'minikube'])
 namespace = 'egressd'
 user = os.environ.get('USER', 'unknown-user')
 
+if os.environ['TILT_DEFAULT_REGISTRY']:
+    default_registry(os.environ['TILT_DEFAULT_REGISTRY'])
+
 namespace_create(namespace)
 
+
+go_env = {
+    'CGO_ENABLED': '0',
+    'GOOS': 'linux',
+    'GOARCH': 'amd64',
+}
 local_resource(
     'egressd-compile',
-    'CGO_ENABLED=0 GOOS=linux go build -o ./bin/egressd ./cmd/collector',
+    'go build -o ./bin/egressd ./cmd/collector',
+    env=go_env,
     deps=[
         './'
     ],
@@ -27,7 +37,8 @@ local_resource(
 
 local_resource(
     'egressd-exporter-compile',
-    'CGO_ENABLED=0 GOOS=linux go build -o ./bin/egressd-exporter ./cmd/exporter',
+    'go build -o ./bin/egressd-exporter ./cmd/exporter',
+    env=go_env,
     deps=[
         './'
     ],
@@ -37,7 +48,7 @@ local_resource(
 )
 
 docker_build_with_restart(
-    'localhost:5000/egressd',
+    'egressd',
     '.',
     entrypoint=['/usr/local/bin/egressd'],
     dockerfile='Dockerfile.tilt',
@@ -50,7 +61,7 @@ docker_build_with_restart(
 )
 
 docker_build_with_restart(
-    'localhost:5000/egressd-exporter',
+    'egressd-exporter',
     '.',
     entrypoint=['/usr/local/bin/egressd-exporter'],
     dockerfile='Dockerfile.exporter.tilt',
@@ -71,24 +82,5 @@ k8s_yaml(helm(
     values=['./charts/egressd/values-tilt.yaml']
 ))
 
-helm_remote(
-    'grafana',
-    repo_url='https://grafana.github.io/helm-charts',
-    repo_name='grafana',
-    version='6.50.7',
-    namespace=namespace,
-    set=[],
-    values=['./hack/grafana-tilt-values.yaml']
-)
-
-helm_remote(
-    'victoria-metrics-single',
-    repo_url='https://victoriametrics.github.io/helm-charts',
-    repo_name='victoria',
-    version='0.8.58',
-    namespace=namespace,
-    set=[],
-    values=[]
-)
 
 k8s_yaml('./hack/network-test-app.yaml')

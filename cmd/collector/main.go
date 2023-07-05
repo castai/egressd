@@ -25,6 +25,8 @@ import (
 
 	"github.com/castai/egressd/collector"
 	"github.com/castai/egressd/conntrack"
+	"github.com/castai/egressd/dns"
+	"github.com/castai/egressd/ebpf"
 	"github.com/castai/egressd/kube"
 )
 
@@ -71,6 +73,8 @@ func main() {
 }
 
 func run(log logrus.FieldLogger) error {
+	log.Infof("starting egressd, version=%s, commit=%s, ref=%s, read-interval=%s", Version, GitCommit, GitRef, *readInterval)
+
 	restconfig, err := retrieveKubeConfig(log, *kubeconfig)
 	if err != nil {
 		return err
@@ -97,10 +101,19 @@ func run(log logrus.FieldLogger) error {
 	} else {
 		conntracker, err = conntrack.NewNetfilterClient(log)
 	}
-
 	if err != nil {
 		return err
 	}
+
+	tracer := ebpf.NewTracer(log, ebpf.Config{
+		QueueSize: 1000,
+		// Custom path should be used only for testing purposes in case there is no btf (local docker).
+		// In prod do not set this and enable tracer only if ebpf.IsKernelBTFAvailable returns true.
+		//CustomBTFFilePath: "/app/cmd/tracer/5.8.0-63-generic.btf",
+	})
+
+	ip2dns := &dns.IP2DNS{Tracer: tracer}
+
 	cfg := collector.Config{
 		ReadInterval:      *readInterval,
 		CleanupInterval:   *cleanupInterval,
@@ -114,6 +127,7 @@ func run(log logrus.FieldLogger) error {
 		log,
 		podsByNodeCache,
 		conntracker,
+		ip2dns,
 		collector.CurrentTimeGetter(),
 	)
 
@@ -148,15 +162,35 @@ func run(log logrus.FieldLogger) error {
 		cancel()
 	}()
 
+	errc := make(chan error)
 	go func() {
-		if err := coll.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			log.Errorf("starting collector: %v", err)
+		if err := ip2dns.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			err = fmt.Errorf("starting ip2dns: %w", err)
+			log.Error(err.Error())
+			errc <- err
 		}
+		close(errc)
 	}()
 
-	log.Infof("running egressd, version=%s, commit=%s, ref=%s, read-interval=%s", Version, GitCommit, GitRef, *readInterval)
+	go func() {
+		if err := coll.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			err = fmt.Errorf("starting collector: %w", err)
+			log.Error(err.Error())
+			errc <- err
+		}
+		close(errc)
+	}()
 
-	return srv.ListenAndServe()
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, context.Canceled) {
+			err = fmt.Errorf("starting http server: %w", err)
+			log.Error(err.Error())
+			errc <- err
+		}
+		close(errc)
+	}()
+
+	return <-errc
 }
 
 func retrieveKubeConfig(log logrus.FieldLogger, kubepath string) (*rest.Config, error) {
