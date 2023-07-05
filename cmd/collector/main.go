@@ -105,14 +105,14 @@ func run(log logrus.FieldLogger) error {
 		return err
 	}
 
-	tracer := ebpf.NewTracer(log, ebpf.Config{
-		QueueSize: 1000,
-		// Custom path should be used only for testing purposes in case there is no btf (local docker).
-		// In prod do not set this and enable tracer only if ebpf.IsKernelBTFAvailable returns true.
-		//CustomBTFFilePath: "/app/cmd/tracer/5.8.0-63-generic.btf",
-	})
-
-	ip2dns := &dns.IP2DNS{Tracer: tracer}
+	var ip2dns dns.DNSLookup = &dns.Noop{}
+	if ebpf.IsKernelBTFAvailable() {
+		tracer := ebpf.NewTracer(log, ebpf.Config{
+			// TODO: Configurable
+			QueueSize: 1000,
+		})
+		ip2dns = &dns.IP2DNS{Tracer: tracer}
+	}
 
 	cfg := collector.Config{
 		ReadInterval:      *readInterval,
