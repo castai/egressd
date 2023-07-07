@@ -3,7 +3,9 @@ package dns
 import (
 	"context"
 	"sync"
+	"time"
 
+	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/google/gopacket/layers"
 	"inet.af/netaddr"
 
@@ -22,16 +24,19 @@ type tracer interface {
 	Events() <-chan ebpf.DNSEvent
 }
 
+var defaultDNSTTL = 5 * time.Minute
+
 type IP2DNS struct {
 	Tracer      tracer
-	ipToName    map[string]string
-	cnameToName map[string]string
+	ipToName    *cache.Cache[string, string]
+	cnameToName *cache.Cache[string, string]
 	mu          sync.RWMutex
 }
 
 func (d *IP2DNS) Start(ctx context.Context) error {
-	d.ipToName = make(map[string]string)
-	d.cnameToName = make(map[string]string)
+
+	d.ipToName = cache.NewContext[string, string](ctx)
+	d.cnameToName = cache.NewContext[string, string](ctx)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -61,16 +66,20 @@ func (d *IP2DNS) Start(ctx context.Context) error {
 				defer d.mu.Unlock()
 				for _, answer := range ev.Answers {
 					name := string(answer.Name)
+					ttl := time.Duration(answer.TTL) * time.Second
+					if ttl == 0 {
+						ttl = defaultDNSTTL
+					}
 					switch answer.Type { //nolint:exhaustive
 					case layers.DNSTypeA:
-						if cname, found := d.cnameToName[name]; found {
+						if cname, found := d.cnameToName.Get(name); found {
 							name = cname
 						}
 						ip := answer.IP.To4()
-						d.ipToName[ip.String()] = name
+						d.ipToName.Set(ip.String(), name, cache.WithExpiration(ttl))
 					case layers.DNSTypeCNAME:
 						cname := string(answer.CNAME)
-						d.cnameToName[cname] = name
+						d.cnameToName.Set(cname, name, cache.WithExpiration(ttl))
 					default:
 						continue
 					}
@@ -83,5 +92,6 @@ func (d *IP2DNS) Start(ctx context.Context) error {
 func (d *IP2DNS) Lookup(ip netaddr.IP) string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return d.ipToName[ip.String()]
+	value, _ := d.ipToName.Get(ip.String())
+	return value
 }
