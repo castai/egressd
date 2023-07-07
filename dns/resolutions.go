@@ -61,7 +61,7 @@ func (d *IP2DNS) Start(ctx context.Context) error {
 				defer d.mu.Unlock()
 				for _, answer := range ev.Answers {
 					name := string(answer.Name)
-					switch answer.Type {
+					switch answer.Type { //nolint:exhaustive
 					case layers.DNSTypeA:
 						if cname, found := d.cnameToName[name]; found {
 							name = cname
