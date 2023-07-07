@@ -1,14 +1,6 @@
-imagePullSecrets:
-- name: gitlab-registry
-
-castai:
-  apiKey: 8066002633e2a66d632b9bc104a3ce0ef71c6e892f86a260c2045e99744de3f8
-  clusterID: 3a535226-45ba-48bf-958c-a433ae8e5aaf
-  apiURL: https://api-karolyzas.localenv.cast.ai
-
 collector:
   image:
-    repository: localhost:5000/egressd
+    repository: egressd
 
   extraArgs:
     log-level: debug
@@ -18,7 +10,7 @@ collector:
 
 exporter:
   image:
-    repository: localhost:5000/egressd-exporter
+    repository: egressd-exporter
 
   extraArgs:
     log-level: debug

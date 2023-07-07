@@ -12,7 +12,7 @@ allow_k8s_contexts(['tilt', 'kind-tilt', 'docker-desktop', 'minikube'])
 namespace = 'egressd'
 user = os.environ.get('USER', 'unknown-user')
 
-if os.environ['TILT_DEFAULT_REGISTRY']:
+if os.environ.get('TILT_DEFAULT_REGISTRY'):
     default_registry(os.environ['TILT_DEFAULT_REGISTRY'])
 
 namespace_create(namespace)
