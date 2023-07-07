@@ -74,6 +74,7 @@ collector:
     group-public-ips: "false"
     send-traffic-delta: true
 
+  enableDnsTrace: true
   prometheusScrape:
     enabled: true
 

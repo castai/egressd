@@ -64,9 +64,11 @@ spec:
         - mountPath: /hostproc/sys/net/netfilter
           name: netfilter
           mountPropagation: Bidirectional
+        {{- if .Values.collector.enableDnsTrace }}
         - mountPath: /sys/fs/cgroup
           name: cgroup
           mountPropagation: Bidirectional
+        {{- end }}
         ports:
         - containerPort: {{.Values.collector.httpListenPort}}
           name: http-server
@@ -88,9 +90,11 @@ spec:
         - name: netfilter
           hostPath:
             path: /proc/sys/net/netfilter
+        {{- if .Values.collector.enableDnsTrace }}
         - name: cgroup
           hostPath:
             path: /sys/fs/cgroup
+        {{- end }}
         - name: cilium-bpf-maps
           hostPath:
             path: /sys/fs/bpf
