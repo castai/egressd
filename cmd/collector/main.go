@@ -31,16 +31,17 @@ import (
 )
 
 var (
-	kubeconfig        = flag.String("kubeconfig", "", "")
-	logLevel          = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
-	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
-	cleanupInterval   = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
-	httpListenPort    = flag.Int("http-listen-port", 8008, "HTTP server listen port")
-	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
-	dumpCT            = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
-	ciliumClockSource = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
-	groupPublicIPs    = flag.Bool("group-public-ips", false, "Group public ips destinations as 0.0.0.0")
-	sendTrafficDelta  = flag.Bool("send-traffic-delta", false, "Send traffic delta between reads of conntrack entry. Traffic counter is sent by default")
+	kubeconfig             = flag.String("kubeconfig", "", "")
+	logLevel               = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
+	readInterval           = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
+	cleanupInterval        = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
+	httpListenPort         = flag.Int("http-listen-port", 8008, "HTTP server listen port")
+	excludeNamespaces      = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
+	dumpCT                 = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
+	ciliumClockSource      = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
+	groupPublicIPs         = flag.Bool("group-public-ips", false, "Group public ips destinations as 0.0.0.0")
+	sendTrafficDelta       = flag.Bool("send-traffic-delta", false, "Send traffic delta between reads of conntrack entry. Traffic counter is sent by default")
+	ebpfDNSTracerQueueSize = flag.Int("ebpf-dns-tracer-queue-size", 1000, "Size of the queue for DNS tracer")
 )
 
 // These should be set via `go build` during a release.
@@ -108,8 +109,7 @@ func run(log logrus.FieldLogger) error {
 	var ip2dns dns.DNSLookup = &dns.Noop{}
 	if ebpf.IsKernelBTFAvailable() {
 		tracer := ebpf.NewTracer(log, ebpf.Config{
-			// TODO: Configurable
-			QueueSize: 1000,
+			QueueSize: *ebpfDNSTracerQueueSize,
 		})
 		ip2dns = &dns.IP2DNS{Tracer: tracer}
 	}
