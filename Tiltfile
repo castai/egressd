@@ -89,5 +89,25 @@ k8s_yaml(helm(
     values=['./charts/egressd/values-tilt.yaml']
 ))
 
+if os.environ.get("DISABLE_METRICS", "false") != "false":
+    helm_remote(
+        'grafana',
+        repo_url='https://grafana.github.io/helm-charts',
+        repo_name='grafana',
+        version='6.50.7',
+        namespace=namespace,
+        set=[],
+        values=['./hack/grafana-tilt-values.yaml']
+    )
+
+    helm_remote(
+        'victoria-metrics-single',
+        repo_url='https://victoriametrics.github.io/helm-charts',
+        repo_name='victoria',
+        version='0.8.58',
+        namespace=namespace,
+        set=[],
+        values=[]
+    )
 
 k8s_yaml('./hack/network-test-app.yaml')
