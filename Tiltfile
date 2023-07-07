@@ -23,6 +23,13 @@ go_env = {
     'GOOS': 'linux',
     'GOARCH': 'amd64',
 }
+
+# Allow to override architecture, e.g. when building on M1,
+# but running on GKE.
+goarch = os.environ.get('TILT_GOARCH')
+if goarch:
+    go_env['GOARCH'] = goarch
+
 local_resource(
     'egressd-compile',
     'go build -o ./bin/egressd ./cmd/collector',
