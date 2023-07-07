@@ -236,7 +236,7 @@ func TestCollector(t *testing.T) {
 		})
 		r.Len(items, 2)
 
-		r.Equal(&pb.RawNetworkMetric{
+		r.Contains(items, &pb.RawNetworkMetric{
 			SrcIp:     168691468,
 			DstIp:     0,
 			TxBytes:   25,
@@ -244,9 +244,9 @@ func TestCollector(t *testing.T) {
 			RxBytes:   0,
 			RxPackets: 0,
 			Proto:     6,
-		}, items[0])
+		})
 
-		r.Equal(&pb.RawNetworkMetric{
+		r.Contains(items, &pb.RawNetworkMetric{
 			SrcIp:     168691468,
 			DstIp:     168691461,
 			TxBytes:   15,
@@ -254,7 +254,7 @@ func TestCollector(t *testing.T) {
 			RxBytes:   0,
 			RxPackets: 0,
 			Proto:     6,
-		}, items[1])
+		})
 	})
 
 	t.Run("multiple collect with no new entries", func(t *testing.T) {
