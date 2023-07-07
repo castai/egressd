@@ -8,7 +8,7 @@ import (
 
 type Noop struct{}
 
-var _ DNSLookup = (*Noop)(nil)
+var _ LookuperStarter = (*Noop)(nil)
 
 func (t *Noop) Start(ctx context.Context) error {
 	<-ctx.Done()

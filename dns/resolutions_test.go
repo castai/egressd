@@ -16,9 +16,7 @@ func TestIP2DNS_Lookup(t *testing.T) {
 	type fields struct {
 		Tracer tracer
 	}
-	type args struct {
-		ip netaddr.IP
-	}
+
 	tests := []struct {
 		name   string
 		fields fields

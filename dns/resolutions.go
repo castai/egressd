@@ -10,12 +10,12 @@ import (
 	"github.com/castai/egressd/ebpf"
 )
 
-type DNSLookup interface {
+type LookuperStarter interface {
 	Start(ctx context.Context) error
 	Lookup(ip netaddr.IP) string
 }
 
-var _ DNSLookup = (*IP2DNS)(nil)
+var _ LookuperStarter = (*IP2DNS)(nil)
 
 type tracer interface {
 	Run(ctx context.Context) error
@@ -71,6 +71,8 @@ func (d *IP2DNS) Start(ctx context.Context) error {
 					case layers.DNSTypeCNAME:
 						cname := string(answer.CNAME)
 						d.cnameToName[cname] = name
+					default:
+						continue
 					}
 				}
 			}()
