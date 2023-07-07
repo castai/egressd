@@ -76,7 +76,7 @@ func installChart(ns, imageTag string) ([]byte, error) {
   --set collector.image.repository=%s \
   --set collector.image.tag=%s \
   --set collector.extraArgs.log-level=debug \
-  --set collector.enableDnsTrace=false \
+  --set collector.extraArgs.ebpf-dns-tracer-enabled=false \
   --set exporter.image.repository=%s \
   --set exporter.image.tag=%s \
   --set exporter.structuredConfig.exportInterval=10s \

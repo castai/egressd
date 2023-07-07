@@ -44,11 +44,7 @@ spec:
         args:
         - "-http-listen-port={{.Values.collector.httpListenPort}}"
         {{- range $key, $value := .Values.collector.extraArgs }}
-        {{- if $value }}
         - "-{{ $key }}={{ $value }}"
-        {{- else }}
-        - "-{{ $key }}"
-        {{- end }}
         {{- end }}
         env:
         - name: NODE_NAME
@@ -64,7 +60,7 @@ spec:
         - mountPath: /hostproc/sys/net/netfilter
           name: netfilter
           mountPropagation: Bidirectional
-        {{- if .Values.collector.enableDnsTrace }}
+        {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled" | default true) }}
         - mountPath: /sys/fs/cgroup
           name: cgroup
           mountPropagation: Bidirectional
@@ -90,7 +86,7 @@ spec:
         - name: netfilter
           hostPath:
             path: /proc/sys/net/netfilter
-        {{- if .Values.collector.enableDnsTrace }}
+        {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled" | default true) }}
         - name: cgroup
           hostPath:
             path: /sys/fs/cgroup
