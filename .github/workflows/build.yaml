@@ -111,7 +111,7 @@ jobs:
 
   e2e:
     name: E2E
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: ${{ github.event_name == 'pull_request' }}
     needs: build
     steps:
