@@ -25,20 +25,24 @@ import (
 
 	"github.com/castai/egressd/collector"
 	"github.com/castai/egressd/conntrack"
+	"github.com/castai/egressd/dns"
+	"github.com/castai/egressd/ebpf"
 	"github.com/castai/egressd/kube"
 )
 
 var (
-	kubeconfig        = flag.String("kubeconfig", "", "")
-	logLevel          = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
-	readInterval      = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
-	cleanupInterval   = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
-	httpListenPort    = flag.Int("http-listen-port", 8008, "HTTP server listen port")
-	excludeNamespaces = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
-	dumpCT            = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
-	ciliumClockSource = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
-	groupPublicIPs    = flag.Bool("group-public-ips", false, "Group public ips destinations as 0.0.0.0")
-	sendTrafficDelta  = flag.Bool("send-traffic-delta", false, "Send traffic delta between reads of conntrack entry. Traffic counter is sent by default")
+	kubeconfig             = flag.String("kubeconfig", "", "")
+	logLevel               = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
+	readInterval           = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
+	cleanupInterval        = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
+	httpListenPort         = flag.Int("http-listen-port", 8008, "HTTP server listen port")
+	excludeNamespaces      = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
+	dumpCT                 = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
+	ciliumClockSource      = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
+	groupPublicIPs         = flag.Bool("group-public-ips", false, "Group public ips destinations as 0.0.0.0")
+	sendTrafficDelta       = flag.Bool("send-traffic-delta", false, "Send traffic delta between reads of conntrack entry. Traffic counter is sent by default")
+	ebpfDNSTracerEnabled   = flag.Bool("ebpf-dns-tracer-enabled", true, "Enable DNS tracer using eBPF")
+	ebpfDNSTracerQueueSize = flag.Int("ebpf-dns-tracer-queue-size", 1000, "Size of the queue for DNS tracer")
 )
 
 // These should be set via `go build` during a release.
@@ -71,6 +75,8 @@ func main() {
 }
 
 func run(log logrus.FieldLogger) error {
+	log.Infof("starting egressd, version=%s, commit=%s, ref=%s, read-interval=%s", Version, GitCommit, GitRef, *readInterval)
+
 	restconfig, err := retrieveKubeConfig(log, *kubeconfig)
 	if err != nil {
 		return err
@@ -97,10 +103,18 @@ func run(log logrus.FieldLogger) error {
 	} else {
 		conntracker, err = conntrack.NewNetfilterClient(log)
 	}
-
 	if err != nil {
 		return err
 	}
+
+	var ip2dns dns.LookuperStarter = &dns.Noop{}
+	if *ebpfDNSTracerEnabled && ebpf.IsKernelBTFAvailable() {
+		tracer := ebpf.NewTracer(log, ebpf.Config{
+			QueueSize: *ebpfDNSTracerQueueSize,
+		})
+		ip2dns = &dns.IP2DNS{Tracer: tracer}
+	}
+
 	cfg := collector.Config{
 		ReadInterval:      *readInterval,
 		CleanupInterval:   *cleanupInterval,
@@ -114,6 +128,7 @@ func run(log logrus.FieldLogger) error {
 		log,
 		podsByNodeCache,
 		conntracker,
+		ip2dns,
 		collector.CurrentTimeGetter(),
 	)
 
@@ -148,15 +163,35 @@ func run(log logrus.FieldLogger) error {
 		cancel()
 	}()
 
+	errc := make(chan error)
 	go func() {
-		if err := coll.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			log.Errorf("starting collector: %v", err)
+		if err := ip2dns.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			err = fmt.Errorf("starting ip2dns: %w", err)
+			log.Error(err.Error())
+			errc <- err
 		}
+		close(errc)
 	}()
 
-	log.Infof("running egressd, version=%s, commit=%s, ref=%s, read-interval=%s", Version, GitCommit, GitRef, *readInterval)
+	go func() {
+		if err := coll.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			err = fmt.Errorf("starting collector: %w", err)
+			log.Error(err.Error())
+			errc <- err
+		}
+		close(errc)
+	}()
 
-	return srv.ListenAndServe()
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, context.Canceled) {
+			err = fmt.Errorf("starting http server: %w", err)
+			log.Error(err.Error())
+			errc <- err
+		}
+		close(errc)
+	}()
+
+	return <-errc
 }
 
 func retrieveKubeConfig(log logrus.FieldLogger, kubepath string) (*rest.Config, error) {

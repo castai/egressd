@@ -46,11 +46,7 @@ func TestCollector(t *testing.T) {
 			ReadInterval:    time.Millisecond,
 			CleanupInterval: 3 * time.Millisecond,
 			NodeName:        "n1",
-		}, log,
-			kubeWatcher,
-			connTracker,
-			mockTimeGetter,
-		)
+		}, log, kubeWatcher, connTracker, &mockIP2DNS{}, mockTimeGetter)
 	}
 
 	t.Run("basic flow", func(t *testing.T) {
@@ -240,7 +236,7 @@ func TestCollector(t *testing.T) {
 		})
 		r.Len(items, 2)
 
-		r.Equal(&pb.RawNetworkMetric{
+		r.Contains(items, &pb.RawNetworkMetric{
 			SrcIp:     168691468,
 			DstIp:     0,
 			TxBytes:   25,
@@ -248,9 +244,9 @@ func TestCollector(t *testing.T) {
 			RxBytes:   0,
 			RxPackets: 0,
 			Proto:     6,
-		}, items[0])
+		})
 
-		r.Equal(&pb.RawNetworkMetric{
+		r.Contains(items, &pb.RawNetworkMetric{
 			SrcIp:     168691468,
 			DstIp:     168691461,
 			TxBytes:   15,
@@ -258,7 +254,7 @@ func TestCollector(t *testing.T) {
 			RxBytes:   0,
 			RxPackets: 0,
 			Proto:     6,
-		}, items[1])
+		})
 	})
 
 	t.Run("multiple collect with no new entries", func(t *testing.T) {
@@ -362,16 +358,12 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		},
 	}
 
-	newCollector := func(connTracker conntrack.Client) *Collector {
+	newCollector := func(connTracker conntrack.Client, ip2dns ipLookup) *Collector {
 		return New(Config{
 			ReadInterval:    time.Millisecond,
 			CleanupInterval: 3 * time.Millisecond,
 			NodeName:        "n1",
-		}, log,
-			kubeWatcher,
-			connTracker,
-			mockTimeGetter,
-		)
+		}, log, kubeWatcher, connTracker, ip2dns, mockTimeGetter)
 	}
 
 	t.Run("metric tx/rx values should be constantly growing counter value when SendTrafficDelta option is false", func(t *testing.T) {
@@ -396,8 +388,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		}
 
 		connTracker := &mockConntrack{entries: initialEntries}
+		dstIp := initialEntries[0].Dst.IP()
+		ip2dns := mockIP2DNS{dstIp: "first-destination.example.com"}
 
-		coll := newCollector(connTracker)
+		coll := newCollector(connTracker, ip2dns)
 		coll.cfg.SendTrafficDelta = false
 
 		// Collect first time.
@@ -406,10 +400,12 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		key1 := entryGroupKey(&initialEntries[0])
 		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
 		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
+		r.Equal("first-destination.example.com", coll.podMetrics[key1].DstDnsName)
 
 		key2 := entryGroupKey(&initialEntries[1])
 		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
 		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
+		r.Equal("", coll.podMetrics[key2].DstDnsName)
 
 		initialEntries[0].TxBytes += 10
 		initialEntries[0].TxPackets += 2
@@ -474,8 +470,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		}
 
 		connTracker := &mockConntrack{entries: initialEntries}
+		dstIp := initialEntries[0].Dst.IP()
+		ip2dns := mockIP2DNS{dstIp: "first-destination.example.com"}
 
-		coll := newCollector(connTracker)
+		coll := newCollector(connTracker, ip2dns)
 		coll.cfg.SendTrafficDelta = true
 
 		// Collect first time.
@@ -484,10 +482,12 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		key1 := entryGroupKey(&initialEntries[0])
 		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
 		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
+		r.Equal("first-destination.example.com", coll.podMetrics[key1].DstDnsName)
 
 		key2 := entryGroupKey(&initialEntries[1])
 		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
 		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
+		r.Equal("", coll.podMetrics[key2].DstDnsName)
 
 		initialEntries[0].TxBytes += 10
 		initialEntries[0].TxPackets += 2
@@ -579,11 +579,7 @@ func BenchmarkCollector(b *testing.B) {
 		ReadInterval:    time.Millisecond,
 		CleanupInterval: 3 * time.Millisecond,
 		NodeName:        "n1",
-	}, log,
-		kubeWatcher,
-		connTracker,
-		mockTimeGetter,
-	)
+	}, log, kubeWatcher, connTracker, &mockIP2DNS{}, mockTimeGetter)
 	expectedConns := podsCount * connsPerPod
 	expectedMetrics := podsCount * connsPerPod
 
@@ -638,4 +634,12 @@ func (m *mockKubeWatcher) Get(nodeName string) ([]*corev1.Pod, error) {
 		}
 	}
 	return res, nil
+}
+
+type mockIP2DNS map[netaddr.IP]string
+
+var _ ipLookup = (mockIP2DNS)(nil)
+
+func (m mockIP2DNS) Lookup(ip netaddr.IP) string {
+	return m[ip]
 }

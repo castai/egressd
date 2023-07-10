@@ -1,6 +1,6 @@
 collector:
   image:
-    repository: localhost:5000/egressd
+    repository: egressd
 
   extraArgs:
     log-level: debug
@@ -10,7 +10,7 @@ collector:
 
 exporter:
   image:
-    repository: localhost:5000/egressd-exporter
+    repository: egressd-exporter
 
   extraArgs:
     log-level: debug

@@ -24,19 +24,26 @@ func main() {
 		QueueSize: 1000,
 		// Custom path should be used only for testing purposes in case there is no btf (local docker).
 		// In prod do not set this and enable tracer only if ebpf.IsKernelBTFAvailable returns true.
-		CustomBTFFilePath: "/app/cmd/tracer/5.8.0-63-generic.btf",
+		//CustomBTFFilePath: "/app/cmd/tracer/5.8.0-63-generic.btf",
 	})
 	errc := make(chan error, 1)
 	go func() {
 		errc <- tr.Run(ctx)
 	}()
 
-	select {
-	case <-ctx.Done():
-		return
-	case e := <-tr.Events():
-		fmt.Println(e)
-	case err := <-errc:
-		log.Error(err)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Infof("context done: %v", ctx.Err())
+			return
+		case e, ok := <-tr.Events():
+			if !ok {
+				log.Info("events channel closed")
+				return
+			}
+			fmt.Println(e)
+		case err := <-errc:
+			log.Error(err)
+		}
 	}
 }

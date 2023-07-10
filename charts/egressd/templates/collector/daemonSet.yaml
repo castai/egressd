@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "egressd.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "egressd.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "egressd.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+      {{- if .Values.collector.prometheusScrape.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{.Values.collector.httpListenPort}}"
+      {{- end }}
+      {{- with .Values.collector.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app.kubernetes.io/component: egressd-collector
+        {{- include "egressd.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "egressd.collector.serviceAccountName" . }}
+      hostNetwork: true
+      securityContext:
+        {{- toYaml .Values.collector.podSecurityContext | nindent 8 }}
+      containers:
+      - name: egressd
+        securityContext:
+            {{- toYaml .Values.collector.containerSecurityContext | nindent 12 }}
+        image: "{{ .Values.collector.image.repository }}:{{ .Values.collector.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
+        resources:
+            {{- toYaml .Values.collector.resources | nindent 12 }}
+        command:
+        - "/usr/local/bin/egressd"
+        args:
+        - "-http-listen-port={{.Values.collector.httpListenPort}}"
+        {{- range $key, $value := .Values.collector.extraArgs }}
+        - "-{{ $key }}={{ $value }}"
+        {{- end }}
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - mountPath: /sys/fs/bpf
+          mountPropagation: HostToContainer
+          name: cilium-bpf-maps
+        - mountPath: /var/run/egressd
+          name: export-logs
+        - mountPath: /hostproc/sys/net/netfilter
+          name: netfilter
+          mountPropagation: Bidirectional
+        {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
+        - mountPath: /sys/fs/cgroup
+          name: cgroup
+          mountPropagation: Bidirectional
+        {{- end }}
+        ports:
+        - containerPort: {{.Values.collector.httpListenPort}}
+          name: http-server
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            port: http-server
+            path: /healthz
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            port: http-server
+            path: /healthz
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      dnsPolicy: {{.Values.collector.dnsPolicy}}
+      volumes:
+        - name: netfilter
+          hostPath:
+            path: /proc/sys/net/netfilter
+        {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        {{- end }}
+        - name: cilium-bpf-maps
+          hostPath:
+            path: /sys/fs/bpf
+            type: DirectoryOrCreate
+        - name: export-logs
+          hostPath:
+            path: /var/run/egressd
+            type: DirectoryOrCreate
+      {{- with .Values.collector.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.collector.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.collector.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

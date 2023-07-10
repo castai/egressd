@@ -39,8 +39,12 @@ function printJobLogs() {
   kubectl get jobs -owide
   echo "Pods:"
   kubectl get pods -owide
+  echo "E2E Job pods:"
+  kubectl describe pod -l job-name=e2e
   echo "E2E Job logs:"
   kubectl logs -l job-name=e2e --tail=-1
+  echo "Egressd pods:"
+  kubectl describe pod -l app.kubernetes.io/name=egressd
   echo "Egressd logs:"
   kubectl logs -l app.kubernetes.io/name=egressd
   echo "Egressd aggregator logs:"

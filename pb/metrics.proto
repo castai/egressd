@@ -10,6 +10,8 @@ message RawNetworkMetric {
   int64 rx_bytes = 5;
   int64 rx_packets = 6;
   int32 proto = 7;
+  string src_dns_name = 8;
+  string dst_dns_name = 9;
 }
 
 message RawNetworkMetricBatch {
@@ -32,6 +34,8 @@ message PodNetworkMetric {
   int64 rx_bytes = 13;
   int64 rx_packets = 14;
   int32 proto = 15;
+  string src_dns_name = 16;
+  string dst_dns_name = 17;
 }
 
 message PodNetworkMetricBatch {
