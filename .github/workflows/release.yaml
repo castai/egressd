@@ -15,7 +15,7 @@ env:
 jobs:
   release_docker:
     name: Release Docker
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -95,7 +95,7 @@ jobs:
 
   release_chart:
     name: Release Helm Chart
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: release_docker
     steps:
       - name: Checkout
