@@ -60,7 +60,7 @@ spec:
         - mountPath: /hostproc/sys/net/netfilter
           name: netfilter
           mountPropagation: Bidirectional
-        {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled" | default true) }}
+        {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
         - mountPath: /sys/fs/cgroup
           name: cgroup
           mountPropagation: Bidirectional
@@ -86,7 +86,7 @@ spec:
         - name: netfilter
           hostPath:
             path: /proc/sys/net/netfilter
-        {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled" | default true) }}
+        {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
         - name: cgroup
           hostPath:
             path: /sys/fs/cgroup
