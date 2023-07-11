@@ -105,6 +105,11 @@ func (t *Tracer) Run(ctx context.Context) error {
 			return err
 		}
 
+		if len(record.RawSample) < 4 {
+			t.log.Warnf("skipping too small event: %d bytes", len(record.RawSample))
+			continue
+		}
+
 		// First 4 bytes now reserved for payload size. See net_event_context in types.h for full structure.
 		event, err := parseEvent(record.RawSample[4:])
 		if err != nil {
