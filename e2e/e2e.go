@@ -104,7 +104,7 @@ type mockAPI struct {
 func (m *mockAPI) start() {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/v1/security/egress/{cluster_id}", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/v1/kubernetes/external-clusters/{cluster_id}/egressd-logs", func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		clusterID := vars["cluster_id"]
 		gz, err := gzip.NewReader(r.Body)

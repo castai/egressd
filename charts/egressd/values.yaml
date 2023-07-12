@@ -94,7 +94,7 @@ exporter:
     {{- if .Values.castai.apiKey }}
       castai:
         http:
-          url: "{{.Values.castai.apiURL}}/v1/security/egress/{{.Values.castai.clusterID}}"
+          url: "{{.Values.castai.apiURL}}/v1/kubernetes/external-clusters/{{.Values.castai.clusterID}}/egressd-logs"
           compression: gzip
           encoding: protobuf
           method: POST
