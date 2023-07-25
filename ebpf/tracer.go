@@ -1,3 +1,5 @@
+//go:build linux
+
 package ebpf
 
 import (
@@ -17,6 +19,8 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/sirupsen/logrus"
 )
+
+var ErrCgroup2NotMounted = errors.New("cgroup2 not mounted")
 
 type Config struct {
 	QueueSize         int
@@ -74,9 +78,17 @@ func (t *Tracer) Run(ctx context.Context) error {
 
 	// Get the first-mounted cgroupv2 path.
 	cgroupPath, err := detectCgroupPath()
+	if errors.Is(err, ErrCgroup2NotMounted) {
+		if err := mountCgroup2(); err != nil {
+			return fmt.Errorf("cgroup2 not mounted and failed to mount manually: %w", err)
+		}
+		cgroupPath, err = detectCgroupPath()
+	}
 	if err != nil {
 		return err
 	}
+
+	t.log.Debugf("using cgroup2 at %q", cgroupPath)
 
 	l, err := link.AttachCgroup(link.CgroupOptions{
 		Path:    cgroupPath,
@@ -84,7 +96,7 @@ func (t *Tracer) Run(ctx context.Context) error {
 		Program: objs.CgroupIngress,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("attaching cgroup: %w", err)
 	}
 	defer l.Close()
 
@@ -178,5 +190,5 @@ func detectCgroupPath() (string, error) {
 		}
 	}
 
-	return "", errors.New("cgroup2 not mounted")
+	return "", ErrCgroup2NotMounted
 }

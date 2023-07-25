@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -47,14 +48,13 @@ func (d *IP2DNS) Start(ctx context.Context) error {
 	}()
 
 	evCh := d.Tracer.Events()
-	//<-time.After(1 * time.Second)
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-errch:
 			if err != nil {
-				return err
+				return fmt.Errorf("running tracer: %w", err)
 			}
 			return nil
 		case ev, ok := <-evCh:
