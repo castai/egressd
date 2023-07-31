@@ -8,7 +8,15 @@ import (
 	"syscall"
 )
 
-const mountPoint = "/mnt/cgroup2"
+var mountPoint = "/cgroup2"
+
+func init() {
+	// When running with readonly root FS, we can't write to /*, so we
+	// should be able to override the mount point.
+	if p := os.Getenv("CGROUP2_MOUNT_PATH"); p != "" {
+		mountPoint = p
+	}
+}
 
 // mountCgroup2 mounts cgroup2.
 // It should be used on systems that don't have cgroup2 mounted by default.
