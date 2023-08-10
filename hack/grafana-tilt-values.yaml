@@ -25,3 +25,8 @@ datasources:
         type: prometheus
         url: http://victoria-metrics-single-server:8428
         access: proxy
+      - name: Loki
+        type: loki
+        url: http://loki:3100
+        access: proxy
+        isDefault: true
