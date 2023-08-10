@@ -190,12 +190,7 @@ func (c *Collector) collect() error {
 		c.entriesCache[connKey] = conn
 
 		groupKey := entryGroupKey(conn)
-		srcName := c.ip2dns.Lookup(conn.Src.IP())
-		dstName := c.ip2dns.Lookup(conn.Dst.IP())
 		if pm, found := c.podMetrics[groupKey]; found {
-			pm.SrcDnsName = srcName
-			pm.DstDnsName = dstName
-
 			pm.TxBytes += int64(txBytes)
 			pm.TxPackets += int64(txPackets)
 			pm.RxBytes += int64(rxBytes)
@@ -206,8 +201,6 @@ func (c *Collector) collect() error {
 		} else {
 			c.podMetrics[groupKey] = &rawNetworkMetric{
 				RawNetworkMetric: &pb.RawNetworkMetric{
-					SrcDnsName: srcName,
-					DstDnsName: dstName,
 					SrcIp:      toIPint32(conn.Src.IP()),
 					DstIp:      toIPint32(conn.Dst.IP()),
 					TxBytes:    int64(conn.TxBytes),
