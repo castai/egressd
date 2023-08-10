@@ -112,7 +112,7 @@ func run(log logrus.FieldLogger) error {
 		tracer := ebpf.NewTracer(log, ebpf.Config{
 			QueueSize: *ebpfDNSTracerQueueSize,
 		})
-		ip2dns = &dns.IP2DNS{Tracer: tracer}
+		ip2dns = dns.NewIP2DNS(tracer, log)
 	}
 
 	cfg := collector.Config{
@@ -137,6 +137,7 @@ func run(log logrus.FieldLogger) error {
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.HandleFunc("/api/v1/raw-network-metrics", coll.GetRawNetworkMetricsHandler)
+	mux.HandleFunc("/api/v1/ip2dns", ip2dns.GetIp2DnsHandler)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", *httpListenPort),

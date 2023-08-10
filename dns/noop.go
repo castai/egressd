@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"net/http"
 
 	"inet.af/netaddr"
 )
@@ -16,4 +17,12 @@ func (t *Noop) Start(ctx context.Context) error {
 }
 func (t *Noop) Lookup(ip netaddr.IP) string {
 	return ""
+}
+
+func (d *Noop) GetIp2DnsHandler(w http.ResponseWriter, req *http.Request) {
+	var batchBytes []byte
+	w.WriteHeader(http.StatusNoContent)
+	if _, err := w.Write(batchBytes); err != nil {
+		return
+	}
 }
