@@ -150,7 +150,6 @@ func (e *Exporter) export(ctx context.Context) error {
 	// Aggregate raw metrics into pod metrics.
 	var podsMetrics []*pb.PodNetworkMetric
 	for batch := range pulledBatch {
-		// TODO: ip2dns cache
 		e.dnsStorage.Fill(batch.Ip2Domain)
 		for _, rawMetrics := range batch.Items {
 			podMetrics, err := e.buildPodNetworkMetric(rawMetrics)

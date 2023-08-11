@@ -33,7 +33,8 @@ message PodNetworkMetric {
   int64 rx_bytes = 13;
   int64 rx_packets = 14;
   int32 proto = 15;
-  string dst_dns_name = 16;
+  reserved 16; // src_dns_name
+  string dst_dns_name = 17;
 }
 
 message PodNetworkMetricBatch {
