@@ -14,6 +14,7 @@ message RawNetworkMetric {
 
 message RawNetworkMetricBatch {
   repeated RawNetworkMetric items = 1;
+  repeated IP2Domain ip2domain = 2;
 }
 
 message PodNetworkMetric {

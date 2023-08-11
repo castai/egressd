@@ -52,14 +52,14 @@ type rawNetworkMetric struct {
 	lifetime time.Time
 }
 
-type ipLookup interface{ Lookup(netaddr.IP) string }
+type dnsRecorder interface{ Records() []*pb.IP2Domain }
 
 func New(
 	cfg Config,
 	log logrus.FieldLogger,
 	podsWatcher podsWatcher,
 	conntracker conntrack.Client,
-	ip2dns ipLookup,
+	ip2dns dnsRecorder,
 	currentTimeGetter func() time.Time,
 ) *Collector {
 	excludeNsMap := map[string]struct{}{}
@@ -95,7 +95,7 @@ type Collector struct {
 	log               logrus.FieldLogger
 	podsWatcher       podsWatcher
 	conntracker       conntrack.Client
-	ip2dns            ipLookup
+	ip2dns            dnsRecorder
 	entriesCache      map[uint64]*conntrack.Entry
 	podMetrics        map[uint64]*rawNetworkMetric
 	excludeNsMap      map[string]struct{}
@@ -131,7 +131,7 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 		items = append(items, m.RawNetworkMetric)
 	}
 
-	batch := &pb.RawNetworkMetricBatch{Items: items}
+	batch := &pb.RawNetworkMetricBatch{Items: items, Ip2Domain: c.ip2dns.Records()}
 	batchBytes, err := proto.Marshal(batch)
 	if err != nil {
 		c.log.Errorf("marshal batch: %v", err)

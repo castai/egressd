@@ -31,6 +31,7 @@ const (
 )
 
 func New(
+	ctx context.Context,
 	log logrus.FieldLogger,
 	cfg config.Config,
 	kubeWatcher kubeWatcher,
@@ -44,6 +45,7 @@ func New(
 		kubeClient:  kubeClient,
 		httpClient:  newHTTPClient(),
 		sinks:       sinks,
+		dnsStorage:  newDNSStorage(ctx, log),
 	}
 }
 
@@ -54,6 +56,7 @@ type Exporter struct {
 	kubeClient  kubernetes.Interface
 	httpClient  *http.Client
 	sinks       []sinks.Sink
+	dnsStorage  *ip2dns
 }
 
 func (e *Exporter) Start(ctx context.Context) error {
@@ -147,6 +150,8 @@ func (e *Exporter) export(ctx context.Context) error {
 	// Aggregate raw metrics into pod metrics.
 	var podsMetrics []*pb.PodNetworkMetric
 	for batch := range pulledBatch {
+		// TODO: ip2dns cache
+		e.dnsStorage.Fill(batch.Ip2Domain)
 		for _, rawMetrics := range batch.Items {
 			podMetrics, err := e.buildPodNetworkMetric(rawMetrics)
 			if err != nil {
@@ -199,6 +204,9 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 		RxBytes:      conn.RxBytes,
 		RxPackets:    conn.RxPackets,
 		Proto:        conn.Proto,
+	}
+	if !dstIP.IsPrivate() {
+		metric.DstDnsName = e.dnsStorage.Lookup(dstIP)
 	}
 
 	srcNode, err := e.kubeWatcher.GetNodeByName(pod.Spec.NodeName)

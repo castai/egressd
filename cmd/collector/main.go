@@ -107,7 +107,7 @@ func run(log logrus.FieldLogger) error {
 		return err
 	}
 
-	var ip2dns dns.LookuperStarter = &dns.Noop{}
+	var ip2dns dns.DNSCollector = &dns.Noop{}
 	if *ebpfDNSTracerEnabled && ebpf.IsKernelBTFAvailable() {
 		tracer := ebpf.NewTracer(log, ebpf.Config{
 			QueueSize: *ebpfDNSTracerQueueSize,
@@ -137,7 +137,6 @@ func run(log logrus.FieldLogger) error {
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.HandleFunc("/api/v1/raw-network-metrics", coll.GetRawNetworkMetricsHandler)
-	mux.HandleFunc("/api/v1/ip2dns", ip2dns.GetIp2DnsHandler)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", *httpListenPort),
