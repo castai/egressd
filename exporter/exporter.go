@@ -205,9 +205,6 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 		RxPackets:    conn.RxPackets,
 		Proto:        conn.Proto,
 	}
-	if !dstIP.IsPrivate() {
-		metric.DstDnsName = e.dnsStorage.Lookup(dstIP)
-	}
 
 	srcNode, err := e.kubeWatcher.GetNodeByName(pod.Spec.NodeName)
 	if err != nil && !errors.Is(err, kube.ErrNotFound) {
@@ -249,6 +246,8 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 				metric.DstZone = getNodeZone(dstNode)
 			}
 		}
+	} else {
+		metric.DstDnsName = e.dnsStorage.Lookup(dstIP)
 	}
 	return &metric, nil
 }
