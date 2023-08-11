@@ -89,7 +89,7 @@ k8s_yaml(helm(
     values=['./charts/egressd/values-tilt.yaml']
 ))
 
-if os.environ.get("DISABLE_METRICS", "false") != "false":
+if os.environ.get("ENABLE_METRICS", "false") == "true":
     helm_remote(
         'grafana',
         repo_url='https://grafana.github.io/helm-charts',

@@ -1,16 +1,3 @@
-test:
-  enabled: false
-monitoring:
-  lokiCanary:
-    enabled: false
-  selfMonitoring:
-    enabled: false
-    grafanaAgent:
-      installOperator: false
-
-gateway:
-  enabled: false
-
 memberlist:
   service:
     publishNotReadyAddresses: true
