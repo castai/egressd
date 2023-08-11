@@ -1,0 +1,13 @@
+memberlist:
+  service:
+    publishNotReadyAddresses: true
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: 'filesystem'
+
+singleBinary:
+  replicas: 1

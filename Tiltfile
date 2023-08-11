@@ -89,7 +89,7 @@ k8s_yaml(helm(
     values=['./charts/egressd/values-tilt.yaml']
 ))
 
-if os.environ.get("DISABLE_METRICS", "false") != "false":
+if os.environ.get("ENABLE_METRICS", "false") == "true":
     helm_remote(
         'grafana',
         repo_url='https://grafana.github.io/helm-charts',
@@ -98,6 +98,29 @@ if os.environ.get("DISABLE_METRICS", "false") != "false":
         namespace=namespace,
         set=[],
         values=['./hack/grafana-tilt-values.yaml']
+    )
+    k8s_resource(
+      workload='grafana',
+      port_forwards=[
+        port_forward(name="grafana", local_port=3334, container_port=3000),
+      ],
+    )
+
+    helm_remote(
+      'loki',
+      repo_url='https://grafana.github.io/helm-charts',
+      repo_name='grafana',
+      release_name='loki',
+      namespace=namespace,
+      version='5.2.0',
+      values=['./hack/loki-tilt-values.yaml'],
+      set=[]
+    )
+    k8s_resource(
+      workload='loki',
+      port_forwards=[
+        port_forward(name="ui", local_port=3101, container_port=3100),
+      ],
     )
 
     helm_remote(
@@ -109,5 +132,18 @@ if os.environ.get("DISABLE_METRICS", "false") != "false":
         set=[],
         values=[]
     )
+
+    helm_remote(
+      'promtail',
+      repo_url='https://grafana.github.io/helm-charts',
+      repo_name='grafana',
+      release_name='promtail',
+      namespace=namespace,
+      version='3.11.0',
+      values=['./hack/promtail-values.yaml'],
+      set=[]
+    )
+
+
 
 k8s_yaml('./hack/network-test-app.yaml')
