@@ -44,7 +44,3 @@ message IP2Domain {
   string ip = 1;
   string domain = 2;
 }
-
-message IP2DomainBatch {
-  repeated IP2Domain items = 1;
-}

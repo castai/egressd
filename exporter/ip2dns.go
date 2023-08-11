@@ -17,7 +17,7 @@ type ip2dns struct {
 	ipToName *cache.Cache[string, string]
 }
 
-func newDNSStorage(ctx context.Context, log logrus.FieldLogger) *ip2dns {
+func newDNSCache(ctx context.Context, log logrus.FieldLogger) *ip2dns {
 	return &ip2dns{
 		log:    log,
 		ipToName: cache.NewContext[string, string](ctx),
@@ -33,7 +33,7 @@ func (d *ip2dns) Fill(items []*pb.IP2Domain) {
 func (d *ip2dns) Lookup(ip netaddr.IP) string {
 	value, ok := d.ipToName.Get(ip.String())
 	if !ok {
-		d.log.Debugf("doman not found for IP %q", ip.String())
+		d.log.Debugf("domain not found for IP %q", ip.String())
 	}
 	return value
 }

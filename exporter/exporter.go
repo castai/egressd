@@ -45,7 +45,7 @@ func New(
 		kubeClient:  kubeClient,
 		httpClient:  newHTTPClient(),
 		sinks:       sinks,
-		dnsStorage:  newDNSStorage(ctx, log),
+		dnsStorage:  newDNSCache(ctx, log),
 	}
 }
 
