@@ -3,7 +3,10 @@ package kube
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"time"
 
+	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -18,6 +21,8 @@ const (
 var (
 	ErrNotFound      = errors.New("object not found")
 	ErrToManyObjects = errors.New("too many objects")
+
+	exitedPodTimeout = 1 * time.Minute
 )
 
 func NewPodsByNodeCache(informer cache.SharedIndexInformer) *PodsByNodeCache {
@@ -68,6 +73,11 @@ func NewPodByIPCache(informer cache.SharedIndexInformer) *PodByIPCache {
 				if t.Status.Phase == corev1.PodRunning {
 					return []string{t.Status.PodIP}, nil
 				}
+				if t.Status.Phase == corev1.PodSucceeded || t.Status.Phase == corev1.PodFailed {
+					if podExitedBeforeTimeout(t) {
+						return []string{t.Status.PodIP}, nil
+					}
+				}
 				return []string{}, nil
 			}
 			return nil, fmt.Errorf("expected pod, got unknown type %T", obj)
@@ -76,6 +86,14 @@ func NewPodByIPCache(informer cache.SharedIndexInformer) *PodByIPCache {
 		panic(err)
 	}
 	return &PodByIPCache{informer: informer}
+}
+
+func podExitedBeforeTimeout(t *corev1.Pod) bool {
+	podReady, found := lo.Find(t.Status.Conditions, func(c corev1.PodCondition) bool {
+		return c.Type == corev1.PodReady
+	})
+	deadLine := time.Now().UTC().Add(-exitedPodTimeout)
+	return found && podReady.LastTransitionTime.UTC().After(deadLine)
 }
 
 type PodByIPCache struct {
@@ -90,9 +108,9 @@ func (p *PodByIPCache) Get(ip string) (*corev1.Pod, error) {
 	if len(pods) == 0 {
 		return nil, ErrNotFound
 	}
-	if len(pods) > 1 {
-		return nil, ErrToManyObjects
-	}
+	sort.Slice(pods, func(i, j int) bool {
+		return pods[i].(*corev1.Pod).CreationTimestamp.Before(&pods[j].(*corev1.Pod).CreationTimestamp)
+	})
 	pod := pods[0]
 	return pod.(*corev1.Pod), nil
 }
@@ -186,8 +204,9 @@ func defaultTransformFunc(obj interface{}) (interface{}, error) {
 			HostNetwork: t.Spec.HostNetwork,
 		}
 		t.Status = corev1.PodStatus{
-			PodIP: t.Status.PodIP,
-			Phase: t.Status.Phase,
+			PodIP:      t.Status.PodIP,
+			Phase:      t.Status.Phase,
+			Conditions: t.Status.Conditions,
 		}
 		t.SetLabels(nil)
 		t.SetAnnotations(nil)
