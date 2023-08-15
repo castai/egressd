@@ -134,7 +134,7 @@ func TestExporter(t *testing.T) {
 			},
 		},
 	}
-	ex := New(log, cfg, kubeWatcher, kubeClient, []sinks.Sink{sink})
+	ex := New(ctx, log, cfg, kubeWatcher, kubeClient, []sinks.Sink{sink})
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

@@ -45,7 +45,7 @@ func New(
 		kubeClient:  kubeClient,
 		httpClient:  newHTTPClient(),
 		sinks:       sinks,
-		dnsStorage:  newDNSCache(ctx, log),
+		dnsStorage:  newDnsStorage(ctx, log),
 	}
 }
 
@@ -56,7 +56,7 @@ type Exporter struct {
 	kubeClient  kubernetes.Interface
 	httpClient  *http.Client
 	sinks       []sinks.Sink
-	dnsStorage  *ip2dns
+	dnsStorage  *dnsStorage
 }
 
 func (e *Exporter) Start(ctx context.Context) error {
