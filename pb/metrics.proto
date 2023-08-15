@@ -42,6 +42,6 @@ message PodNetworkMetricBatch {
 }
 
 message IP2Domain {
-  string ip = 1;
+  int32 ip = 1;
   string domain = 2;
 }

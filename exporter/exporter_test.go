@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
+	"github.com/castai/egressd/dns"
 	"github.com/castai/egressd/exporter/config"
 	"github.com/castai/egressd/exporter/sinks"
 	"github.com/castai/egressd/kube"
@@ -98,7 +99,7 @@ func TestExporter(t *testing.T) {
 				},
 			},
 			Ip2Domain: []*pb.IP2Domain{
-				{Ip: publicIp.String(), Domain: "example.com"},
+				{Ip: dns.ToIPint32(publicIp), Domain: "example.com"},
 			},
 		}
 		batchBytes, err := proto.Marshal(batch)

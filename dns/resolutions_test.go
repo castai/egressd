@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"github.com/stretchr/testify/require"
+	"inet.af/netaddr"
 
 	"github.com/castai/egressd/ebpf"
 	"github.com/castai/egressd/pb"
@@ -47,9 +48,9 @@ func TestIP2DNS_Records(t *testing.T) {
 				},
 			})},
 			want: []*pb.IP2Domain{
-				{Ip: "1.2.3.4", Domain: "example.com"},
-				{Ip: "1.2.3.5", Domain: "hi.example.com"},
-				{Ip: "1.2.3.6", Domain: "ehlo.example.com"},
+				{Ip: ToIPint32(netaddr.IPv4(1,2,3,4)), Domain: "example.com"},
+				{Ip: ToIPint32(netaddr.IPv4(1,2,3,5)), Domain: "hi.example.com"},
+				{Ip: ToIPint32(netaddr.IPv4(1,2,3,6)), Domain: "ehlo.example.com"},
 			},
 		},
 
@@ -73,7 +74,7 @@ func TestIP2DNS_Records(t *testing.T) {
 				},
 			})},
 			want: []*pb.IP2Domain{
-				{Ip: "1.2.3.4", Domain: "example.com"},
+				{Ip: ToIPint32(netaddr.IPv4(1,2,3,4)), Domain: "example.com"},
 			},
 		},
 	}

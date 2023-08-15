@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/castai/egressd/dns"
 	"github.com/castai/egressd/exporter/config"
 	"github.com/castai/egressd/exporter/sinks"
 	"github.com/castai/egressd/kube"
@@ -246,7 +247,7 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 			}
 		}
 	} else {
-		metric.DstDnsName = e.dnsStorage.Lookup(dstIP)
+		metric.DstDnsName = e.dnsStorage.Lookup(dns.ToIPint32(dstIP))
 	}
 	return &metric, nil
 }

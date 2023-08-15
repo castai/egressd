@@ -2,12 +2,14 @@ package dns
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"time"
 
 	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/google/gopacket/layers"
 	"github.com/sirupsen/logrus"
+	"inet.af/netaddr"
 
 	"github.com/castai/egressd/ebpf"
 	"github.com/castai/egressd/pb"
@@ -30,7 +32,7 @@ var defaultDNSTTL = 2 * time.Minute
 type IP2DNS struct {
 	Tracer      tracer
 	log         logrus.FieldLogger
-	ipToName    *cache.Cache[string, string]
+	ipToName    *cache.Cache[int32, string]
 	cnameToName *cache.Cache[string, string]
 }
 
@@ -43,7 +45,7 @@ func NewIP2DNS(tracer tracer, log logrus.FieldLogger) *IP2DNS {
 
 func (d *IP2DNS) Start(ctx context.Context) error {
 
-	d.ipToName = cache.NewContext[string, string](ctx)
+	d.ipToName = cache.NewContext[int32, string](ctx)
 	d.cnameToName = cache.NewContext[string, string](ctx)
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -75,8 +77,8 @@ func (d *IP2DNS) Start(ctx context.Context) error {
 					if cname, found := d.cnameToName.Get(name); found {
 						name = cname
 					}
-					ip := answer.IP.To4()
-					d.ipToName.Set(ip.String(), name, cache.WithExpiration(defaultDNSTTL))
+					ip, _ := netaddr.FromStdIP(answer.IP)
+					d.ipToName.Set(ToIPint32(ip), name, cache.WithExpiration(defaultDNSTTL))
 				case layers.DNSTypeCNAME:
 					cname := string(answer.CNAME)
 					d.cnameToName.Set(cname, name, cache.WithExpiration(defaultDNSTTL))
@@ -95,4 +97,9 @@ func (d *IP2DNS) Records() []*pb.IP2Domain {
 		items = append(items, &pb.IP2Domain{Ip: ip, Domain: domain})
 	}
 	return items
+}
+
+func ToIPint32(ip netaddr.IP) int32 {
+	b := ip.As4()
+	return int32(binary.BigEndian.Uint32([]byte{b[0], b[1], b[2], b[3]}))
 }

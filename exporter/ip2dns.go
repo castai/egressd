@@ -5,22 +5,22 @@ import (
 	"time"
 
 	cache "github.com/Code-Hex/go-generics-cache"
-	"github.com/castai/egressd/pb"
 	"github.com/sirupsen/logrus"
-	"inet.af/netaddr"
+
+	"github.com/castai/egressd/pb"
 )
 
 var defaultDNSTTL = 1 * time.Hour
 
 type dnsStorage struct {
 	log      logrus.FieldLogger
-	ipToName *cache.Cache[string, string]
+	ipToName *cache.Cache[int32, string]
 }
 
 func newDnsStorage(ctx context.Context, log logrus.FieldLogger) *dnsStorage {
 	return &dnsStorage{
-		log:    log,
-		ipToName: cache.NewContext[string, string](ctx),
+		log:      log,
+		ipToName: cache.NewContext[int32, string](ctx),
 	}
 }
 
@@ -30,10 +30,10 @@ func (d *dnsStorage) Fill(items []*pb.IP2Domain) {
 	}
 }
 
-func (d *dnsStorage) Lookup(ip netaddr.IP) string {
-	value, ok := d.ipToName.Get(ip.String())
+func (d *dnsStorage) Lookup(ip int32) string {
+	value, ok := d.ipToName.Get(ip)
 	if !ok {
-		d.log.Debugf("domain not found for IP %q", ip.String())
+		d.log.Debugf("domain not found for IP %q", ipFromInt32(ip))
 	}
 	return value
 }
