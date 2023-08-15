@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"inet.af/netaddr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -29,6 +31,9 @@ func TestExporter(t *testing.T) {
 	ctx := context.Background()
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
+	pod1Ip := netaddr.IPv4(10,14,7,12)
+	pod2Ip := netaddr.IPv4(10,14,7,5)
+	publicIp := netaddr.IPv4(192,0,0,1)
 
 	kubeWatcher := &mockKubeWatcher{
 		pods: []*corev1.Pod{
@@ -41,7 +46,7 @@ func TestExporter(t *testing.T) {
 					NodeName: "n1",
 				},
 				Status: corev1.PodStatus{
-					PodIP: "10.14.7.12",
+					PodIP: pod1Ip.String(),
 				},
 			},
 			{
@@ -53,7 +58,7 @@ func TestExporter(t *testing.T) {
 					NodeName: "n1",
 				},
 				Status: corev1.PodStatus{
-					PodIP: "10.14.7.5",
+					PodIP: pod2Ip.String(),
 				},
 			},
 		},
@@ -74,14 +79,26 @@ func TestExporter(t *testing.T) {
 		batch := &pb.RawNetworkMetricBatch{
 			Items: []*pb.RawNetworkMetric{
 				{
-					SrcIp:     168691468,
-					DstIp:     168691461,
+					SrcIp:     toIPint32(pod1Ip),
+					DstIp:     toIPint32(pod2Ip),
 					TxBytes:   35,
 					TxPackets: 3,
 					RxBytes:   30,
 					RxPackets: 1,
 					Proto:     6,
 				},
+				{
+					SrcIp:     toIPint32(pod1Ip),
+					DstIp:     toIPint32(publicIp),
+					TxBytes:   3,
+					TxPackets: 1,
+					RxBytes:   5,
+					RxPackets: 2,
+					Proto:     6,
+				},
+			},
+			Ip2Domain: []*pb.IP2Domain{
+				{Ip: publicIp.String(), Domain: "example.com"},
 			},
 		}
 		batchBytes, err := proto.Marshal(batch)
@@ -153,8 +170,7 @@ func TestExporter(t *testing.T) {
 		t.Fatal("timeout waiting for sink push")
 	}
 
-	r.Len(pushedBatch.Items, 1)
-	item := pushedBatch.Items[0]
+	r.Len(pushedBatch.Items, 2)
 	r.Equal(&pb.PodNetworkMetric{
 		SrcIp:        "10.14.7.12",
 		SrcPod:       "p1",
@@ -166,12 +182,27 @@ func TestExporter(t *testing.T) {
 		DstNamespace: "team2",
 		DstNode:      "n1",
 		DstZone:      "us-east-1a",
+		DstDnsName:   "",
 		TxBytes:      35,
 		TxPackets:    3,
 		RxBytes:      30,
 		RxPackets:    1,
 		Proto:        6,
-	}, item)
+	}, pushedBatch.Items[0])
+	r.Equal(&pb.PodNetworkMetric{
+		SrcIp:        pod1Ip.String(),
+		SrcPod:       "p1",
+		SrcNamespace: "team1",
+		SrcNode:      "n1",
+		SrcZone:      "us-east-1a",
+		DstIp:        publicIp.String(),
+		DstDnsName:   "example.com",
+		TxBytes:      3,
+		TxPackets:    1,
+		RxBytes:      5,
+		RxPackets:    2,
+		Proto:        6,
+	}, pushedBatch.Items[1])
 }
 
 type mockKubeWatcher struct {
@@ -225,4 +256,9 @@ type mockSink struct {
 func (m *mockSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) error {
 	m.batch <- batch
 	return nil
+}
+
+func toIPint32(ip netaddr.IP) int32 {
+	b := ip.As4()
+	return int32(binary.BigEndian.Uint32([]byte{b[0], b[1], b[2], b[3]}))
 }
