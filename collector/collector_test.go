@@ -358,7 +358,7 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		},
 	}
 
-	newCollector := func(connTracker conntrack.Client, ip2dns ipLookup) *Collector {
+	newCollector := func(connTracker conntrack.Client, ip2dns dnsRecorder) *Collector {
 		return New(Config{
 			ReadInterval:    time.Millisecond,
 			CleanupInterval: 3 * time.Millisecond,
@@ -400,12 +400,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		key1 := entryGroupKey(&initialEntries[0])
 		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
 		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
-		r.Equal("first-destination.example.com", coll.podMetrics[key1].DstDnsName)
 
 		key2 := entryGroupKey(&initialEntries[1])
 		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
 		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
-		r.Equal("", coll.podMetrics[key2].DstDnsName)
 
 		initialEntries[0].TxBytes += 10
 		initialEntries[0].TxPackets += 2
@@ -428,6 +426,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		err := proto.Unmarshal(w.Body.Bytes(), batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
+
+		r.Len(batch.Ip2Domain, 1)
+		r.Equal("first-destination.example.com", batch.Ip2Domain[0].Domain)
+		r.Equal(dstIp.String(), batch.Ip2Domain[0].Ip)
 
 		// Check values are the same as on the last collecting action
 		r.EqualValues(30, batch.Items[0].TxBytes)
@@ -482,12 +484,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		key1 := entryGroupKey(&initialEntries[0])
 		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
 		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
-		r.Equal("first-destination.example.com", coll.podMetrics[key1].DstDnsName)
 
 		key2 := entryGroupKey(&initialEntries[1])
 		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
 		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
-		r.Equal("", coll.podMetrics[key2].DstDnsName)
 
 		initialEntries[0].TxBytes += 10
 		initialEntries[0].TxPackets += 2
@@ -510,6 +510,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		err := proto.Unmarshal(w.Body.Bytes(), batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
+
+		r.Len(batch.Ip2Domain, 1)
+		r.Equal("first-destination.example.com", batch.Ip2Domain[0].Domain)
+		r.Equal(dstIp.String(), batch.Ip2Domain[0].Ip)
 
 		// Check values are the same as on the last collecting action
 		r.EqualValues(30, batch.Items[0].TxBytes)
@@ -638,8 +642,12 @@ func (m *mockKubeWatcher) Get(nodeName string) ([]*corev1.Pod, error) {
 
 type mockIP2DNS map[netaddr.IP]string
 
-var _ ipLookup = (mockIP2DNS)(nil)
+var _ dnsRecorder = (mockIP2DNS)(nil)
 
-func (m mockIP2DNS) Lookup(ip netaddr.IP) string {
-	return m[ip]
+func (m mockIP2DNS) Records() []*pb.IP2Domain {
+	items := make([]*pb.IP2Domain, 0, len(m))
+	for ip, domain := range m {
+		items = append(items, &pb.IP2Domain{Ip: ip.String(), Domain: domain})
+	}
+	return items
 }
