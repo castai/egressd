@@ -31,6 +31,9 @@ func (d *dnsStorage) Fill(items []*pb.IP2Domain) {
 }
 
 func (d *dnsStorage) Lookup(ip int32) string {
+	if ip == 0 {
+		return ""
+	}
 	value, ok := d.ipToName.Get(ip)
 	if !ok {
 		d.log.Debugf("domain not found for IP %q", ipFromInt32(ip))
