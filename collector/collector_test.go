@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/castai/egressd/conntrack"
+	"github.com/castai/egressd/dns"
 	"github.com/castai/egressd/pb"
 )
 
@@ -358,7 +359,7 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		},
 	}
 
-	newCollector := func(connTracker conntrack.Client, ip2dns ipLookup) *Collector {
+	newCollector := func(connTracker conntrack.Client, ip2dns dnsRecorder) *Collector {
 		return New(Config{
 			ReadInterval:    time.Millisecond,
 			CleanupInterval: 3 * time.Millisecond,
@@ -389,7 +390,7 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 
 		connTracker := &mockConntrack{entries: initialEntries}
 		dstIp := initialEntries[0].Dst.IP()
-		ip2dns := mockIP2DNS{dstIp: "first-destination.example.com"}
+		ip2dns := mockIP2DNS{dns.ToIPint32(dstIp): "first-destination.example.com"}
 
 		coll := newCollector(connTracker, ip2dns)
 		coll.cfg.SendTrafficDelta = false
@@ -400,12 +401,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		key1 := entryGroupKey(&initialEntries[0])
 		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
 		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
-		r.Equal("first-destination.example.com", coll.podMetrics[key1].DstDnsName)
 
 		key2 := entryGroupKey(&initialEntries[1])
 		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
 		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
-		r.Equal("", coll.podMetrics[key2].DstDnsName)
 
 		initialEntries[0].TxBytes += 10
 		initialEntries[0].TxPackets += 2
@@ -428,6 +427,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		err := proto.Unmarshal(w.Body.Bytes(), batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
+
+		r.Len(batch.Ip2Domain, 1)
+		r.Equal("first-destination.example.com", batch.Ip2Domain[0].Domain)
+		r.Equal(dns.ToIPint32(dstIp), batch.Ip2Domain[0].Ip)
 
 		// Check values are the same as on the last collecting action
 		r.EqualValues(30, batch.Items[0].TxBytes)
@@ -471,7 +474,7 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 
 		connTracker := &mockConntrack{entries: initialEntries}
 		dstIp := initialEntries[0].Dst.IP()
-		ip2dns := mockIP2DNS{dstIp: "first-destination.example.com"}
+		ip2dns := mockIP2DNS{dns.ToIPint32(dstIp): "first-destination.example.com"}
 
 		coll := newCollector(connTracker, ip2dns)
 		coll.cfg.SendTrafficDelta = true
@@ -482,12 +485,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		key1 := entryGroupKey(&initialEntries[0])
 		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
 		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
-		r.Equal("first-destination.example.com", coll.podMetrics[key1].DstDnsName)
 
 		key2 := entryGroupKey(&initialEntries[1])
 		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
 		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
-		r.Equal("", coll.podMetrics[key2].DstDnsName)
 
 		initialEntries[0].TxBytes += 10
 		initialEntries[0].TxPackets += 2
@@ -510,6 +511,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		err := proto.Unmarshal(w.Body.Bytes(), batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
+
+		r.Len(batch.Ip2Domain, 1)
+		r.Equal("first-destination.example.com", batch.Ip2Domain[0].Domain)
+		r.Equal(dns.ToIPint32(dstIp), batch.Ip2Domain[0].Ip)
 
 		// Check values are the same as on the last collecting action
 		r.EqualValues(30, batch.Items[0].TxBytes)
@@ -636,10 +641,14 @@ func (m *mockKubeWatcher) Get(nodeName string) ([]*corev1.Pod, error) {
 	return res, nil
 }
 
-type mockIP2DNS map[netaddr.IP]string
+type mockIP2DNS map[int32]string
 
-var _ ipLookup = (mockIP2DNS)(nil)
+var _ dnsRecorder = (mockIP2DNS)(nil)
 
-func (m mockIP2DNS) Lookup(ip netaddr.IP) string {
-	return m[ip]
+func (m mockIP2DNS) Records() []*pb.IP2Domain {
+	items := make([]*pb.IP2Domain, 0, len(m))
+	for ip, domain := range m {
+		items = append(items, &pb.IP2Domain{Ip: ip, Domain: domain})
+	}
+	return items
 }

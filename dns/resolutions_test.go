@@ -10,9 +10,10 @@ import (
 	"inet.af/netaddr"
 
 	"github.com/castai/egressd/ebpf"
+	"github.com/castai/egressd/pb"
 )
 
-func TestIP2DNS_Lookup(t *testing.T) {
+func TestIP2DNS_Records(t *testing.T) {
 	type fields struct {
 		Tracer tracer
 	}
@@ -20,7 +21,7 @@ func TestIP2DNS_Lookup(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields fields
-		want   map[string]string
+		want   []*pb.IP2Domain
 	}{
 		{
 			name: "resolves simple A record",
@@ -46,11 +47,10 @@ func TestIP2DNS_Lookup(t *testing.T) {
 					},
 				},
 			})},
-			want: map[string]string{
-				"1.2.3.4": "example.com",
-				"1.2.3.5": "hi.example.com",
-				"1.2.3.6": "ehlo.example.com",
-				"4.3.2.1": "",
+			want: []*pb.IP2Domain{
+				{Ip: ToIPint32(netaddr.IPv4(1,2,3,4)), Domain: "example.com"},
+				{Ip: ToIPint32(netaddr.IPv4(1,2,3,5)), Domain: "hi.example.com"},
+				{Ip: ToIPint32(netaddr.IPv4(1,2,3,6)), Domain: "ehlo.example.com"},
 			},
 		},
 
@@ -73,9 +73,8 @@ func TestIP2DNS_Lookup(t *testing.T) {
 					},
 				},
 			})},
-			want: map[string]string{
-				"1.2.3.4": "example.com",
-				"4.3.2.1": "",
+			want: []*pb.IP2Domain{
+				{Ip: ToIPint32(netaddr.IPv4(1,2,3,4)), Domain: "example.com"},
 			},
 		},
 	}
@@ -87,12 +86,9 @@ func TestIP2DNS_Lookup(t *testing.T) {
 			ip2dns := &IP2DNS{
 				Tracer: tt.fields.Tracer,
 			}
-			_ = ip2dns.Start(ctx)
-			for arg, want := range tt.want {
-				ip := netaddr.MustParseIP(arg)
-				got := ip2dns.Lookup(ip)
-				require.Equal(t, want, got, "Lookup(%s)", ip)
-			}
+			err := ip2dns.Start(ctx)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, ip2dns.Records())
 		})
 	}
 }

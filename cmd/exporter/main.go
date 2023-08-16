@@ -139,7 +139,7 @@ func run(log logrus.FieldLogger) error {
 		return errors.New("not sinks configured")
 	}
 
-	ex := exporter.New(log, cfg, kw, clientset, sinksList)
+	ex := exporter.New(ctx, log, cfg, kw, clientset, sinksList)
 	go func() {
 		if err := ex.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			log.Errorf("exporter start: %v", err)

@@ -107,12 +107,12 @@ func run(log logrus.FieldLogger) error {
 		return err
 	}
 
-	var ip2dns dns.LookuperStarter = &dns.Noop{}
+	var ip2dns dns.DNSCollector = &dns.Noop{}
 	if *ebpfDNSTracerEnabled && ebpf.IsKernelBTFAvailable() {
 		tracer := ebpf.NewTracer(log, ebpf.Config{
 			QueueSize: *ebpfDNSTracerQueueSize,
 		})
-		ip2dns = &dns.IP2DNS{Tracer: tracer}
+		ip2dns = dns.NewIP2DNS(tracer, log)
 	}
 
 	cfg := collector.Config{

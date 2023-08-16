@@ -17,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/castai/egressd/conntrack"
+	"github.com/castai/egressd/dns"
 	"github.com/castai/egressd/metrics"
 	"github.com/castai/egressd/pb"
 )
@@ -52,14 +53,14 @@ type rawNetworkMetric struct {
 	lifetime time.Time
 }
 
-type ipLookup interface{ Lookup(netaddr.IP) string }
+type dnsRecorder interface{ Records() []*pb.IP2Domain }
 
 func New(
 	cfg Config,
 	log logrus.FieldLogger,
 	podsWatcher podsWatcher,
 	conntracker conntrack.Client,
-	ip2dns ipLookup,
+	ip2dns dnsRecorder,
 	currentTimeGetter func() time.Time,
 ) *Collector {
 	excludeNsMap := map[string]struct{}{}
@@ -95,7 +96,7 @@ type Collector struct {
 	log               logrus.FieldLogger
 	podsWatcher       podsWatcher
 	conntracker       conntrack.Client
-	ip2dns            ipLookup
+	ip2dns            dnsRecorder
 	entriesCache      map[uint64]*conntrack.Entry
 	podMetrics        map[uint64]*rawNetworkMetric
 	excludeNsMap      map[string]struct{}
@@ -131,7 +132,7 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 		items = append(items, m.RawNetworkMetric)
 	}
 
-	batch := &pb.RawNetworkMetricBatch{Items: items}
+	batch := &pb.RawNetworkMetricBatch{Items: items, Ip2Domain: c.ip2dns.Records()}
 	batchBytes, err := proto.Marshal(batch)
 	if err != nil {
 		c.log.Errorf("marshal batch: %v", err)
@@ -190,12 +191,7 @@ func (c *Collector) collect() error {
 		c.entriesCache[connKey] = conn
 
 		groupKey := entryGroupKey(conn)
-		srcName := c.ip2dns.Lookup(conn.Src.IP())
-		dstName := c.ip2dns.Lookup(conn.Dst.IP())
 		if pm, found := c.podMetrics[groupKey]; found {
-			pm.SrcDnsName = srcName
-			pm.DstDnsName = dstName
-
 			pm.TxBytes += int64(txBytes)
 			pm.TxPackets += int64(txPackets)
 			pm.RxBytes += int64(rxBytes)
@@ -206,10 +202,8 @@ func (c *Collector) collect() error {
 		} else {
 			c.podMetrics[groupKey] = &rawNetworkMetric{
 				RawNetworkMetric: &pb.RawNetworkMetric{
-					SrcDnsName: srcName,
-					DstDnsName: dstName,
-					SrcIp:      toIPint32(conn.Src.IP()),
-					DstIp:      toIPint32(conn.Dst.IP()),
+					SrcIp:      dns.ToIPint32(conn.Src.IP()),
+					DstIp:      dns.ToIPint32(conn.Dst.IP()),
 					TxBytes:    int64(conn.TxBytes),
 					TxPackets:  int64(conn.TxPackets),
 					RxBytes:    int64(conn.RxBytes),
@@ -316,9 +310,4 @@ func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 
 	conntrackEntryHash.Reset()
 	return res
-}
-
-func toIPint32(ip netaddr.IP) int32 {
-	b := ip.As4()
-	return int32(binary.BigEndian.Uint32([]byte{b[0], b[1], b[2], b[3]}))
 }

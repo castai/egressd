@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/castai/egressd/dns"
 	"github.com/castai/egressd/exporter/config"
 	"github.com/castai/egressd/exporter/sinks"
 	"github.com/castai/egressd/kube"
@@ -31,6 +32,7 @@ const (
 )
 
 func New(
+	ctx context.Context,
 	log logrus.FieldLogger,
 	cfg config.Config,
 	kubeWatcher kubeWatcher,
@@ -44,6 +46,7 @@ func New(
 		kubeClient:  kubeClient,
 		httpClient:  newHTTPClient(),
 		sinks:       sinks,
+		dnsStorage:  newDnsStorage(ctx, log),
 	}
 }
 
@@ -54,6 +57,7 @@ type Exporter struct {
 	kubeClient  kubernetes.Interface
 	httpClient  *http.Client
 	sinks       []sinks.Sink
+	dnsStorage  *dnsStorage
 }
 
 func (e *Exporter) Start(ctx context.Context) error {
@@ -147,6 +151,7 @@ func (e *Exporter) export(ctx context.Context) error {
 	// Aggregate raw metrics into pod metrics.
 	var podsMetrics []*pb.PodNetworkMetric
 	for batch := range pulledBatch {
+		e.dnsStorage.Fill(batch.Ip2Domain)
 		for _, rawMetrics := range batch.Items {
 			podMetrics, err := e.buildPodNetworkMetric(rawMetrics)
 			if err != nil {
@@ -190,12 +195,10 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 	dstIP := ipFromInt32(conn.DstIp)
 	metric := pb.PodNetworkMetric{
 		SrcIp:        srcIP.String(),
-		SrcDnsName:   conn.SrcDnsName,
 		SrcPod:       pod.Name,
 		SrcNamespace: pod.Namespace,
 		SrcNode:      pod.Spec.NodeName,
 		DstIp:        dstIP.String(),
-		DstDnsName:   conn.DstDnsName,
 		TxBytes:      conn.TxBytes,
 		TxPackets:    conn.TxPackets,
 		RxBytes:      conn.RxBytes,
@@ -243,6 +246,8 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 				metric.DstZone = getNodeZone(dstNode)
 			}
 		}
+	} else {
+		metric.DstDnsName = e.dnsStorage.Lookup(dns.ToIPint32(dstIP))
 	}
 	return &metric, nil
 }
