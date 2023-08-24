@@ -44,6 +44,11 @@ Start all components + test grafana,promtheus in tilt local k8s cluster.
 tilt up
 ```
 
+### Release procedure (with automatic release notes)
+
+Head to the [GitHub new release page](https://github.com/castai/egressd/releases/new), create a new tag at the top, and click `Generate Release Notes` at the middle-right.
+![image](https://user-images.githubusercontent.com/571022/174777789-2d7d646d-714d-42da-8c66-a6ed407b4440.png)
+
 Run e2e tests locally
 ```
 KIND_CONTEXT=tilt IMAGE_TAG=local ./e2e/run.sh
