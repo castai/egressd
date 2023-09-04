@@ -89,3 +89,15 @@ spec:
         configMap:
           name: {{ include "egressd.exporter.fullname" . }}
           {{- end }}
+      {{- with .Values.exporter.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.exporter.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.exporter.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
