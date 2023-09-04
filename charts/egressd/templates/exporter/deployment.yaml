@@ -49,17 +49,20 @@ spec:
         {{- end }}
         {{- end }}
         env:
-            {{- if .Values.castai.apiKey }}
-        - name: CASTAI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "{{- include "egressd.fullname" . }}"
-              key: API_KEY
-            {{- end }}
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        envFrom:
+          - secretRef:
+              {{- if .Values.castai.apiKey }}
+                {{- if ne .Values.castai.apiKeySecretRef "" }}
+                {{- fail "apiKey and apiKeySecretRef are mutually exclusive" }}
+                {{- end }}
+              name: "{{- include "egressd.fullname" . }}"
+              {{- else }}
+              name: {{ required "apiKey or apiKeySecretRef must be provided" .Values.castai.apiKeySecretRef }}
+              {{- end }}
         ports:
         - name: http-server
           containerPort: {{ .Values.exporter.httpListenPort }}

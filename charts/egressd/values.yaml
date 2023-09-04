@@ -91,7 +91,7 @@ exporter:
     log:
       level: "debug"
     sinks:
-    {{- if .Values.castai.apiKey }}
+    {{- if or .Values.castai.apiKey .Values.castai.apiKeySecretRef }}
       castai:
         http:
           url: "{{.Values.castai.apiURL}}/v1/kubernetes/clusters/{{.Values.castai.clusterID}}/egressd-metrics"
@@ -99,7 +99,7 @@ exporter:
           encoding: protobuf
           method: POST
           headers:
-            X-API-Key: "${CASTAI_API_KEY}"
+            X-API-Key: "${API_KEY}"
     {{- end }}
 
   # Exporter global configuration for convenient overrides without changing the whole config yaml file. Final config is merged from both config and structuredConfig.
