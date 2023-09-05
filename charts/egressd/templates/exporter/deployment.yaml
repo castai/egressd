@@ -49,6 +49,10 @@ spec:
         {{- end }}
         {{- end }}
         env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         {{- if or .Values.castai.apiKey .Values.castai.apiKeySecretRef }}
         - name: API_KEY
           valueFrom:
@@ -61,10 +65,6 @@ spec:
               key: API_KEY
               {{- end }}
         {{- end }}
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
         ports:
         - name: http-server
           containerPort: {{ .Values.exporter.httpListenPort }}
