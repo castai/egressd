@@ -108,11 +108,15 @@ func (p *PodByIPCache) Get(ip string) (*corev1.Pod, error) {
 	if len(pods) == 0 {
 		return nil, ErrNotFound
 	}
-	sort.Slice(pods, func(i, j int) bool {
+	sort.SliceStable(pods, func(i, j int) bool {
 		return pods[i].(*corev1.Pod).CreationTimestamp.Before(&pods[j].(*corev1.Pod).CreationTimestamp)
 	})
-	pod := pods[0]
-	return pod.(*corev1.Pod), nil
+	for i := range pods {
+		if pod := pods[i]; pod != nil {
+			return pod.(*corev1.Pod), nil
+		}
+	}
+	return nil, ErrNotFound
 }
 
 func NewNodeByNameCache(informer cache.SharedIndexInformer) *NodeByNameCache {
