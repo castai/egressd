@@ -37,6 +37,8 @@ spec:
       - name: exporter
         image: "{{ .Values.exporter.image.repository }}:{{ .Values.exporter.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: IfNotPresent
+        resources:
+            {{- toYaml .Values.exporter.resources | nindent 12 }}
         securityContext:
             {{- toYaml .Values.exporter.containerSecurityContext | nindent 12 }}
         args:
