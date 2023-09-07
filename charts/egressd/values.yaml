@@ -127,6 +127,9 @@ exporter:
     seccompProfile:
       type: RuntimeDefault
 
+  podSecurityContext: { }
+  # fsGroup: 2000
+
   containerSecurityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
