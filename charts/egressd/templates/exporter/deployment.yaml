@@ -19,7 +19,7 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{.Values.exporter.httpListenPort}}"
       {{- end }}
-      {{- with .Values.collector.podAnnotations }}
+      {{- with .Values.exporter.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
@@ -30,9 +30,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "egressd.exporter.serviceAccountName" . }}
-      dnsPolicy: {{.Values.collector.dnsPolicy}}
+      dnsPolicy: {{.Values.exporter.dnsPolicy}}
       securityContext:
-        {{- toYaml .Values.collector.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.exporter.podSecurityContext | nindent 8 }}
       containers:
       - name: exporter
         image: "{{ .Values.exporter.image.repository }}:{{ .Values.exporter.image.tag | default .Chart.AppVersion }}"
