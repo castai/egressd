@@ -101,19 +101,26 @@ type PodByIPCache struct {
 }
 
 func (p *PodByIPCache) Get(ip string) (*corev1.Pod, error) {
-	pods, err := p.informer.GetIndexer().ByIndex(podIPIdx, ip)
+	items, err := p.informer.GetIndexer().ByIndex(podIPIdx, ip)
 	if err != nil {
 		return nil, err
 	}
-	if len(pods) == 0 {
+	if len(items) == 0 {
 		return nil, ErrNotFound
 	}
+	pods := lo.FilterMap(items, func(item interface{}, i int) (*corev1.Pod, bool) {
+		pod, ok := item.(*corev1.Pod)
+		if !ok {
+			return nil, false
+		}
+		return pod, true
+	})
 	sort.SliceStable(pods, func(i, j int) bool {
-		return pods[i].(*corev1.Pod).CreationTimestamp.Before(&pods[j].(*corev1.Pod).CreationTimestamp)
+		return pods[i].CreationTimestamp.Before(&pods[j].CreationTimestamp)
 	})
 	for i := range pods {
 		if pod := pods[i]; pod != nil {
-			return pod.(*corev1.Pod), nil
+			return pod, nil
 		}
 	}
 	return nil, ErrNotFound
