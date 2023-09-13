@@ -62,7 +62,7 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 
 	switch s.cfg.Encoding {
 	case config.EncodingProtobuf:
-		header.Set(headerContentType, "protobuf")
+		header.Set(headerContentType, "application/protobuf")
 		protoBytes, err := proto.Marshal(batch)
 		if err != nil {
 			return err
