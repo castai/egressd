@@ -132,7 +132,8 @@ func (e *Exporter) export(ctx context.Context) error {
 						return fmt.Errorf("fetching metrics from collector, url=%s: %w", url, err)
 					}
 					if len(batch.Items) == 0 {
-						return fmt.Errorf("no metrics found in collector %q", pod.Name)
+						e.log.Warnf("no metrics found in collector %q", pod.Name)
+						return nil
 					}
 					pulledBatch <- batch
 					return nil
