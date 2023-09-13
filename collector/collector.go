@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -20,6 +21,13 @@ import (
 	"github.com/castai/egressd/dns"
 	"github.com/castai/egressd/metrics"
 	"github.com/castai/egressd/pb"
+)
+
+const (
+	headerUserAgent       = "User-Agent"
+	headerContentType     = "Content-Type"
+	headerContentEncoding = "Content-Encoding"
+	headerContentLen      = "Content-Length"
 )
 
 func CurrentTimeGetter() func() time.Time {
@@ -42,6 +50,8 @@ type Config struct {
 	// SendTrafficDelta used to determines if traffic should be sent as delta of 2 consecutive conntrack entries
 	// or as the constantly growing counter value
 	SendTrafficDelta bool
+	// EnableCompression will enable gzip compression for metrics 
+	EnableCompression bool
 }
 
 type podsWatcher interface {
@@ -133,16 +143,35 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 	}
 
 	batch := &pb.RawNetworkMetricBatch{Items: items, Ip2Domain: c.ip2dns.Records()}
+	w.Header().Set(headerContentType, "application/protobuf")
 	batchBytes, err := proto.Marshal(batch)
 	if err != nil {
 		c.log.Errorf("marshal batch: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if _, err := w.Write(batchBytes); err != nil {
-		c.log.Errorf("write batch: %v", err)
-		return
+
+	if c.cfg.EnableCompression {
+		w.Header().Set(headerContentEncoding, "gzip")
+		gzWriter := gzip.NewWriter(w)
+		if _, err := gzWriter.Write(batchBytes); err != nil {
+			c.log.Errorf("gzip write: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err := gzWriter.Close(); err != nil {
+			c.log.Errorf("gzip close: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+	} else {
+		if _, err := w.Write(batchBytes); err != nil {
+			c.log.Errorf("write batch: %v", err)
+			return
+		}
 	}
+
 	if c.cfg.SendTrafficDelta {
 		// reset metric tx/rx values, so only delta numbers will be sent with the next batch
 		for _, m := range c.podMetrics {
@@ -202,13 +231,13 @@ func (c *Collector) collect() error {
 		} else {
 			c.podMetrics[groupKey] = &rawNetworkMetric{
 				RawNetworkMetric: &pb.RawNetworkMetric{
-					SrcIp:      dns.ToIPint32(conn.Src.IP()),
-					DstIp:      dns.ToIPint32(conn.Dst.IP()),
-					TxBytes:    int64(conn.TxBytes),
-					TxPackets:  int64(conn.TxPackets),
-					RxBytes:    int64(conn.RxBytes),
-					RxPackets:  int64(conn.RxPackets),
-					Proto:      int32(conn.Proto),
+					SrcIp:     dns.ToIPint32(conn.Src.IP()),
+					DstIp:     dns.ToIPint32(conn.Dst.IP()),
+					TxBytes:   int64(conn.TxBytes),
+					TxPackets: int64(conn.TxPackets),
+					RxBytes:   int64(conn.RxBytes),
+					RxPackets: int64(conn.RxPackets),
+					Proto:     int32(conn.Proto),
 				},
 				lifetime: conn.Lifetime,
 			}
