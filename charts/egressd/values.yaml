@@ -49,7 +49,7 @@ collector:
   resources:
     requests:
       cpu: 50m
-      memory: 100Mi
+      memory: 128Mi
     limits:
       memory: 1Gi
 
@@ -130,8 +130,8 @@ exporter:
 
   resources:
     requests:
-      cpu: 10m
-      memory: 50Mi
+      cpu: 50m
+      memory: 100Mi
     limits:
       memory: 512Mi
 
