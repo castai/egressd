@@ -8,6 +8,7 @@ import (
 
 	ct "github.com/florianl/go-conntrack"
 	"github.com/sirupsen/logrus"
+	"github.com/vishvananda/netns"
 	"inet.af/netaddr"
 
 	"github.com/castai/egressd/metrics"
@@ -31,7 +32,11 @@ func NewNetfilterClient(log logrus.FieldLogger) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initing nf_conntrack_acct: %w", err)
 	}
-	nfct, err := ct.Open(&ct.Config{})
+	hostNs, err := netns.GetFromPid(1)
+	if err != nil {
+		return nil, err
+	}
+	nfct, err := ct.Open(&ct.Config{NetNS: int(hostNs)})
 	if err != nil {
 		return nil, fmt.Errorf("opening nfct: %w", err)
 	}

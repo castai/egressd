@@ -28,7 +28,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "egressd.collector.serviceAccountName" . }}
-      hostNetwork: true
+      hostPID: true
       securityContext:
         {{- toYaml .Values.collector.podSecurityContext | nindent 8 }}
       containers:
