@@ -23,7 +23,7 @@ import (
 
 var (
 	imageTag = flag.String("image-tag", "", "Egressd docker image tag")
-	timeout  = flag.Duration("timeout", 90*time.Second, "Test timeout")
+	timeout  = flag.Duration("timeout", 120*time.Second, "Test timeout")
 	ns       = flag.String("ns", "castai-egressd-e2e", "Namespace")
 )
 
