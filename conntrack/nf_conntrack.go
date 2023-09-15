@@ -20,7 +20,7 @@ type nfctDumper interface {
 }
 
 var (
-	accounting = "/hostproc/sys/net/netfilter/nf_conntrack_acct"
+	accounting = "/proc/sys/net/netfilter/nf_conntrack_acct"
 )
 
 func initNetfilterAccounting() error {
