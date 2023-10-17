@@ -38,18 +38,32 @@ jobs:
           key: ${{ runner.os }}-build-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-build-
 
-      - name: Build egressd collector go binary
-        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./cmd/collector
+      - name: Build egressd collector go binary amd64
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./cmd/collector-amd64
         env:
           GOOS: linux
           GOARCH: amd64
           CGO_ENABLED: 0
 
-      - name: Build egressd exporter go binary
-        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd-exporter ./cmd/exporter
+      - name: Build egressd collector go binary arm64
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd ./cmd/collector-arm64
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: 0
+
+      - name: Build egressd exporter go binary amd64
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd-exporter ./cmd/exporter-amd64
         env:
           GOOS: linux
           GOARCH: amd64
+          CGO_ENABLED: 0
+
+      - name: Build egressd exporter go binary arm64
+        run: go build -ldflags "-s -w -X main.GitCommit=$GITHUB_SHA -X main.GitRef=$GITHUB_REF -X main.Version=${RELEASE_TAG:-commit-$GITHUB_SHA}" -o bin/egressd-exporter ./cmd/exporter-arm64
+        env:
+          GOOS: linux
+          GOARCH: arm64
           CGO_ENABLED: 0
 
       - name: Run golangci-lint
