@@ -39,8 +39,6 @@ spec:
         imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
         resources:
             {{- toYaml .Values.collector.resources | nindent 12 }}
-        command:
-        - "/usr/local/bin/egressd"
         args:
         - "-http-listen-port={{.Values.collector.httpListenPort}}"
         {{- range $key, $value := .Values.collector.extraArgs }}
