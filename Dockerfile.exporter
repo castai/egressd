@@ -1,3 +1,4 @@
 FROM gcr.io/distroless/static-debian11
-COPY ./bin/egressd-exporter /usr/local/bin/egressd-exporter
+ARG TARGETARCH
+COPY ./bin/egressd-exporter-$TARGETARCH /usr/local/bin/egressd-exporter
 ENTRYPOINT ["/usr/local/bin/egressd-exporter"]

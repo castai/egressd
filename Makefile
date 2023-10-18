@@ -64,3 +64,7 @@ gen-bpf-docker: builder-image
 .PHONY: builder-image-enter
 builder-image-enter: builder-image
 	$(CMD_DOCKER_BUILDER)
+
+.PHONY: build-push-bpftool
+build-push-bpftool:
+	docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.bpftool -t ghcr.io/castai/egressd/bpftool:$(IMAGE_TAG) --push .
