@@ -24,7 +24,7 @@ fullnameOverride: ""
 collector:
   # Set to true to enable PriorityClass, false to disable
   enablePriorityClass: true
-  # If not set default = "egressd-priority"
+  # If not set default = "system-critical"
   egressdPriorityClass: ""
   image:
     repository: ghcr.io/castai/egressd/egressd

@@ -27,7 +27,7 @@ spec:
         {{- end }}
     spec:
       {{- if .Values.collector.enablePriorityClass }}
-      priorityClassName: {{ default "egressd-priority" .Values.collector.egressdPriorityClass }}
+      priorityClassName: {{ default "system-critical" .Values.collector.egressdPriorityClass }}
       {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
