@@ -1,0 +1,6 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: egressd-priority
+  namespace: namespace: {{ .Release.Namespace }}
+value: 1000000000

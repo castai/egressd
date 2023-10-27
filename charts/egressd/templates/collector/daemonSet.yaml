@@ -26,6 +26,9 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      {{- if .Values.collector.enablePriorityClass }}
+      priorityClassName: {{ default "egressd-priority" .Values.collector.egressdPriorityClass }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
