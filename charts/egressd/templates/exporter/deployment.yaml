@@ -23,7 +23,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "egressd.exporter.labels" . | nindent 8 }}
+        {{- include "egressd.exporter.selectorLabels" . | nindent 8 }}
+        {{- with .Values.exporter.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
