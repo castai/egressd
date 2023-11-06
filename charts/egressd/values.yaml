@@ -37,7 +37,15 @@ collector:
     # If not set and create is true, a name is generated using the fullname template
     name: ""
 
+
+  ## Annotations to be added to collector pod
+  ##
   podAnnotations: { }
+
+
+  ## Labels to be added to collector pod
+  ##
+  podLabels: { }
 
   podSecurityContext: { }
   # fsGroup: 2000
@@ -112,7 +120,15 @@ exporter:
     # If not set and create is true, a name is generated using the fullname template
     name: ""
 
+
+  ## Annotations to be added to exporter pod
+  ##
   podAnnotations: { }
+
+
+  ## Labels to be added to exporter pod
+  ##
+  podLabels: { }
 
   podSecurityContext:
     fsGroup: 10001
