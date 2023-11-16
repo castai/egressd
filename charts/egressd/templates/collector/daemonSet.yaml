@@ -26,8 +26,8 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      {{- if .Values.collector.enablePriorityClass }}
-      priorityClassName: {{ default "system-critical" .Values.collector.egressdPriorityClass }}
+      {{- if .Values.collector.priorityClassName }}
+      priorityClassName: {{ .Values.collector.priorityClassName }}
       {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

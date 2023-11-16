@@ -22,10 +22,6 @@ nameOverride: ""
 fullnameOverride: ""
 
 collector:
-  # Set to true to enable PriorityClass, false to disable
-  enablePriorityClass: true
-  # If not set default = "system-critical"
-  egressdPriorityClass: ""
   image:
     repository: ghcr.io/castai/egressd/egressd
     pullPolicy: IfNotPresent
@@ -41,9 +37,8 @@ collector:
     # If not set and create is true, a name is generated using the fullname template
     name: ""
 
+  priorityClassName: "system-critical"
 
-  ## Annotations to be added to collector pod
-  ##
   podAnnotations: { }
 
 
