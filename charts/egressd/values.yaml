@@ -37,8 +37,11 @@ collector:
     # If not set and create is true, a name is generated using the fullname template
     name: ""
 
+  ## The name of the PriorityClass for collector pods
   priorityClassName: "system-critical"
 
+  ## Annotations to be added to collector pod
+  ##
   podAnnotations: { }
 
 
