@@ -123,6 +123,9 @@ exporter:
     name: ""
 
 
+  ## The name of the PriorityClass for exporter pods
+  priorityClassName: "system-critical"
+
   ## Annotations to be added to exporter pod
   ##
   podAnnotations: { }
