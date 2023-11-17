@@ -11,7 +11,8 @@ then
   exit 1
 fi
 
-name=egressd
+name=egressd-$GOARCH
+exporter_name=egressd-exporter-$GOARCH
 
 # Build e2e docker image.
 pushd ./e2e
@@ -28,9 +29,9 @@ then
   docker build . -t $name:local -f Dockerfile
   kind load docker-image $name:local --name $KIND_CONTEXT
 
-  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name-exporter ./cmd/exporter
-  docker build . -t $name-exporter:local -f Dockerfile.exporter
-  kind load docker-image $name-exporter:local --name $KIND_CONTEXT
+  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$exporter_name ./cmd/exporter
+  docker build . -t $exporter_name:local -f Dockerfile.exporter
+  kind load docker-image $exporter_name:local --name $KIND_CONTEXT
 fi
 
 # Deploy e2e resources.
@@ -52,7 +53,7 @@ function printJobLogs() {
 }
 trap printJobLogs EXIT
 
-ns="castai-$name-e2e"
+ns="castai-egressd-e2e"
 kubectl delete ns $ns --force || true
 kubectl create ns $ns || true
 kubectl config set-context --current --namespace=$ns
