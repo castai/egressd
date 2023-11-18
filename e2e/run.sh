@@ -11,8 +11,8 @@ then
   exit 1
 fi
 
-name=egressd-$GOARCH
-exporter_name=egressd-exporter-$GOARCH
+name=egressd
+exporter_name=egressd-exporter
 
 # Build e2e docker image.
 pushd ./e2e
@@ -25,11 +25,11 @@ kind load docker-image $name-e2e:local --name $KIND_CONTEXT
 
 if [ "$IMAGE_TAG" == "local" ]
 then
-  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name ./cmd/collector
+  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name-$GOARCH ./cmd/collector
   docker build . -t $name:local -f Dockerfile
   kind load docker-image $name:local --name $KIND_CONTEXT
 
-  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$exporter_name ./cmd/exporter
+  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$exporter_name-$GOARCH ./cmd/exporter
   docker build . -t $exporter_name:local -f Dockerfile.exporter
   kind load docker-image $exporter_name:local --name $KIND_CONTEXT
 fi
