@@ -38,7 +38,7 @@ collector:
     name: ""
 
   ## The name of the PriorityClass for collector pods
-  priorityClassName: "system-node-critical"
+  priorityClassName: null
 
   ## Annotations to be added to collector pod
   ##
@@ -124,7 +124,7 @@ exporter:
 
 
   ## The name of the PriorityClass for exporter pods
-  priorityClassName: "system-node-critical"
+  priorityClassName: null
 
   ## Annotations to be added to exporter pod
   ##
