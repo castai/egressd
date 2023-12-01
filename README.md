@@ -28,6 +28,7 @@ Example dashboard available at http://localhost:8080/d/egressd/egressd
 Metrics should be visible after few minutes.
 
 ![Dashboard](https://raw.githubusercontent.com/castai/egressd/main/egress.png)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcastai%2Fegressd.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcastai%2Fegressd?ref=badge_shield)
 
 
 **(Optionally) Install demo onlineboutique eshop**
@@ -53,3 +54,7 @@ Run e2e tests locally
 ```
 KIND_CONTEXT=tilt IMAGE_TAG=local ./e2e/run.sh
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcastai%2Fegressd.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcastai%2Fegressd?ref=badge_large)
