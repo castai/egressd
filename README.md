@@ -16,8 +16,9 @@ Kubernetes aware network traffic monitoring.
 
 Egressd runs as priviledged container for a few reasons:
 1. DNS tracer uses eBPF.
-2. Bidirectional mount propogation is used to enable netfilter conntrack accounting and mount cgroupv2.
-
+2. Fetch conntrack entries:
+    * Bidirectional mount propogation is used to enable netfilter conntrack accounting and mount cgroupv2.
+    * If Cilium is used collector reads from ebpf maps which stores data in kernel.
 
 ### Install
 
