@@ -12,6 +12,12 @@ Kubernetes aware network traffic monitoring.
 * Kubernetes context is added including source and destination pods, nodes, node zones, ips.
 * Exporter can export logs to http or prometheus.
 
+#### Priviledges
+
+Egressd runs as priviledged container for a few reasons:
+1. DNS tracer uses eBPF.
+2. Bidirectional mount propogation is used to enable netfilter conntrack accounting and mount cgroupv2.
+
 
 ### Install
 
