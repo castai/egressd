@@ -37,6 +37,25 @@ spec:
       hostNetwork: true
       securityContext:
         {{- toYaml .Values.collector.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: egressd-init
+          securityContext:
+            privileged: true
+          image: "{{ .Values.collector.image.repository }}:{{ .Values.collector.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
+          args:
+            - "-init"
+          volumeMounts:
+            - mountPath: /hostproc/sys/net/netfilter
+              name: netfilter
+              mountPropagation: Bidirectional
+          {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
+            - mountPath: /sys/fs/cgroup
+              name: cgroup
+              mountPropagation: Bidirectional
+            - mountPath: /cgroup2-manual-mount
+              name: cgroup-mountdir
+          {{- end }}
       containers:
       - name: egressd
         securityContext:
@@ -61,17 +80,13 @@ spec:
         - mountPath: /sys/fs/bpf
           mountPropagation: HostToContainer
           name: cilium-bpf-maps
-        - mountPath: /var/run/egressd
-          name: export-logs
         - mountPath: /hostproc/sys/net/netfilter
           name: netfilter
-          mountPropagation: Bidirectional
+          readOnly: true
         {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
         - mountPath: /sys/fs/cgroup
           name: cgroup
-          mountPropagation: Bidirectional
-        - mountPath: /cgroup2-manual-mount
-          name: cgroup-mountdir
+          readOnly: true
         {{- end }}
         ports:
         - containerPort: {{.Values.collector.httpListenPort}}

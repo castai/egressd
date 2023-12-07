@@ -22,15 +22,11 @@ var (
 	accounting = "/hostproc/sys/net/netfilter/nf_conntrack_acct"
 )
 
-func initNetfilterAccounting() error {
+func InitNetfilterAccounting() error {
 	return os.WriteFile(accounting, []byte{'1'}, 0600)
 }
 
 func NewNetfilterClient(log logrus.FieldLogger) (Client, error) {
-	err := initNetfilterAccounting()
-	if err != nil {
-		return nil, fmt.Errorf("initing nf_conntrack_acct: %w", err)
-	}
 	nfct, err := ct.Open(&ct.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("opening nfct: %w", err)

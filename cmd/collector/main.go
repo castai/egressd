@@ -43,6 +43,9 @@ var (
 	sendTrafficDelta       = flag.Bool("send-traffic-delta", false, "Send traffic delta between reads of conntrack entry. Traffic counter is sent by default")
 	ebpfDNSTracerEnabled   = flag.Bool("ebpf-dns-tracer-enabled", true, "Enable DNS tracer using eBPF")
 	ebpfDNSTracerQueueSize = flag.Int("ebpf-dns-tracer-queue-size", 1000, "Size of the queue for DNS tracer")
+	// Kubernetes requires container to run in privileged mode if Bidirectional mount is used.
+	// Actually it needs only SYS_ADMIN but see this issue See https://github.com/kubernetes/kubernetes/pull/117812
+	initMode = flag.Bool("init", false, "Run in init mode to setup conntrack accounting and mount cgroup v2")
 )
 
 // These should be set via `go build` during a release.
@@ -64,6 +67,13 @@ func main() {
 
 	if *dumpCT {
 		if err := dumpConntrack(log); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	if *initMode {
+		if err := runInit(log); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -192,6 +202,25 @@ func run(log logrus.FieldLogger) error {
 	}()
 
 	return <-errc
+}
+
+// runInit runs once in init container.
+func runInit(log logrus.FieldLogger) error {
+	log.Infof("egressd: running init")
+	defer log.Infof("egressd: init done")
+
+	ciliumAvailable := conntrack.CiliumAvailable()
+	if !ciliumAvailable {
+		if err := conntrack.InitNetfilterAccounting(); err != nil {
+			return fmt.Errorf("init nf conntrack: %w", err)
+		}
+	}
+
+	if err := ebpf.InitCgroupv2(); err != nil {
+		return fmt.Errorf("init cgroupv2: %w", err)
+	}
+
+	return nil
 }
 
 func retrieveKubeConfig(log logrus.FieldLogger, kubepath string) (*rest.Config, error) {

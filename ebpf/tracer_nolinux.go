@@ -17,3 +17,7 @@ func (t *Tracer) Events() <-chan DNSEvent {
 func IsKernelBTFAvailable() bool {
 	return false
 }
+
+func InitCgroupv2() error {
+	return nil
+}

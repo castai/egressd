@@ -124,6 +124,16 @@ func IsKernelBTFAvailable() bool {
 	return err == nil
 }
 
+func InitCgroupv2() error {
+	_, err := detectCgroupPath()
+	if errors.Is(err, ErrCgroup2NotMounted) {
+		if err := mountCgroup2(); err != nil {
+			return fmt.Errorf("cgroup2 not mounted and failed to mount manually: %w", err)
+		}
+	}
+	return nil
+}
+
 func parseEvent(data []byte) (DNSEvent, error) {
 	packet := gopacket.NewPacket(
 		data,
