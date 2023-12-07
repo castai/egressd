@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -427,11 +428,15 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		err := proto.Unmarshal(w.Body.Bytes(), batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
+		sort.Slice(batch.Items, func(i, j int) bool {
+			return batch.Items[i].RxBytes < batch.Items[j].RxBytes
+		})
 
 		r.Len(batch.Ip2Domain, 1)
 		r.Equal("first-destination.example.com", batch.Ip2Domain[0].Domain)
 		r.Equal(dns.ToIPint32(dstIp), batch.Ip2Domain[0].Ip)
 
+		spew.Dump(batch.Items)
 		// Check values are the same as on the last collecting action
 		r.EqualValues(30, batch.Items[0].TxBytes)
 		r.EqualValues(5, batch.Items[0].TxPackets)
@@ -511,6 +516,9 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		err := proto.Unmarshal(w.Body.Bytes(), batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
+		sort.Slice(batch.Items, func(i, j int) bool {
+			return batch.Items[i].RxBytes < batch.Items[j].RxBytes
+		})
 
 		r.Len(batch.Ip2Domain, 1)
 		r.Equal("first-destination.example.com", batch.Ip2Domain[0].Domain)
