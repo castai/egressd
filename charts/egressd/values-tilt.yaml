@@ -1,4 +1,7 @@
 collector:
+  hostPID: true
+  hostNetwork: true # On github actions we need host network to access kind host conntrack entries.
+
   image:
     repository: egressd
 

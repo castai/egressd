@@ -49,6 +49,9 @@ collector:
   ##
   podLabels: { }
 
+  hostPID: true
+  hostNetwork: false
+
   podSecurityContext: { }
   # fsGroup: 2000
 
@@ -59,9 +62,9 @@ collector:
       drop:
         - all
       add:
-        - "NET_ADMIN"  # Allows managing network devices and configuring network interfaces.
-        - "SYS_PTRACE"  # Allows ptrace() of any process.
-        - "SYS_ADMIN"  # Allows a wide range of system administration tasks, such as mounting/unmounting filesystems, setting the domainname and hostname, and configuring process accounting and resource limits.
+        - "NET_ADMIN"  # Needed for reading conntrack.
+        - "SYS_PTRACE" # Needed for reading conntrack.
+        - "SYS_ADMIN"  # Needed for reading conntrack and ebpf.
 
   resources:
     requests:

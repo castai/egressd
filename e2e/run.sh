@@ -3,7 +3,7 @@
 set -ex
 
 KIND_CONTEXT="${KIND_CONTEXT:-kind}"
-GOARCH="${GOARCH:-amd64}"
+GOARCH="$(go env GOARCH)"
 
 if [ "$IMAGE_TAG" == "" ]
 then
@@ -24,11 +24,11 @@ kind load docker-image $name-e2e:local --name $KIND_CONTEXT
 
 if [ "$IMAGE_TAG" == "local" ]
 then
-  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name ./cmd/collector
+  GOOS=linux CGO_ENABLED=0 go build -o bin/$name-$GOARCH ./cmd/collector
   docker build . -t $name:local -f Dockerfile
   kind load docker-image $name:local --name $KIND_CONTEXT
 
-  GOOS=linux GOARCH=$GOARCH CGO_ENABLED=0 go build -o bin/$name-exporter ./cmd/exporter
+  GOOS=linux CGO_ENABLED=0 go build -o bin/$name-exporter-$GOARCH ./cmd/exporter
   docker build . -t $name-exporter:local -f Dockerfile.exporter
   kind load docker-image $name-exporter:local --name $KIND_CONTEXT
 fi

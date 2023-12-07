@@ -34,13 +34,14 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "egressd.collector.serviceAccountName" . }}
-      hostPID: true
+      hostPID: {{ .Values.collector.hostPID }}
+      hostNetwork: {{ .Values.collector.hostNetwork }}
       securityContext:
         {{- toYaml .Values.collector.podSecurityContext | nindent 8 }}
       initContainers:
         - name: egressd-init
           securityContext:
-            privileged: true
+            privileged: true # See https://github.com/kubernetes/kubernetes/pull/117812
           image: "{{ .Values.collector.image.repository }}:{{ .Values.collector.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
           args:
