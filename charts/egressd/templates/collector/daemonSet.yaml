@@ -34,7 +34,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "egressd.collector.serviceAccountName" . }}
-      hostNetwork: true
+      hostPID: true
       securityContext:
         {{- toYaml .Values.collector.podSecurityContext | nindent 8 }}
       initContainers:
@@ -45,6 +45,9 @@ spec:
           imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
           args:
             - "-init"
+          env:
+            - name: CGROUP2_MOUNT_PATH
+              value: /cgroup2-manual-mount/cgroup2
           volumeMounts:
             - mountPath: /hostproc/sys/net/netfilter
               name: netfilter
@@ -74,15 +77,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: CGROUP2_MOUNT_PATH
-          value: /cgroup2-manual-mount/cgroup2
         volumeMounts:
         - mountPath: /sys/fs/bpf
           mountPropagation: HostToContainer
           name: cilium-bpf-maps
-        - mountPath: /hostproc/sys/net/netfilter
-          name: netfilter
-          readOnly: true
         {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
         - mountPath: /sys/fs/cgroup
           name: cgroup
@@ -117,10 +115,6 @@ spec:
         - name: cilium-bpf-maps
           hostPath:
             path: /sys/fs/bpf
-            type: DirectoryOrCreate
-        - name: export-logs
-          hostPath:
-            path: /var/run/egressd
             type: DirectoryOrCreate
         - name: cgroup-mountdir
           emptyDir: {}
