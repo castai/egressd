@@ -17,6 +17,7 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/sirupsen/logrus"
 )
 
 var ErrCgroup2NotMounted = errors.New("cgroup2 not mounted")
@@ -124,9 +125,10 @@ func IsKernelBTFAvailable() bool {
 	return err == nil
 }
 
-func InitCgroupv2() error {
+func InitCgroupv2(log logrus.FieldLogger) error {
 	_, err := detectCgroupPath()
 	if errors.Is(err, ErrCgroup2NotMounted) {
+		log.Info("mounting cgroup v2")
 		if err := mountCgroup2(); err != nil {
 			return fmt.Errorf("cgroup2 not mounted and failed to mount manually: %w", err)
 		}

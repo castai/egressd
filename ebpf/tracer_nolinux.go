@@ -4,6 +4,8 @@ package ebpf
 
 import (
 	"context"
+
+	"github.com/sirupsen/logrus"
 )
 
 func (t *Tracer) Run(ctx context.Context) error {
@@ -18,6 +20,6 @@ func IsKernelBTFAvailable() bool {
 	return false
 }
 
-func InitCgroupv2() error {
+func InitCgroupv2(log logrus.FieldLogger) error {
 	return nil
 }

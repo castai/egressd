@@ -109,8 +109,10 @@ func run(log logrus.FieldLogger) error {
 	var conntracker conntrack.Client
 	ciliumAvailable := conntrack.CiliumAvailable()
 	if ciliumAvailable {
+		log.Info("using cilium conntrack client")
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
 	} else {
+		log.Info("using netfilter conntrack client")
 		conntracker, err = conntrack.NewNetfilterClient(log)
 	}
 	if err != nil {
@@ -206,17 +208,18 @@ func run(log logrus.FieldLogger) error {
 
 // runInit runs once in init container.
 func runInit(log logrus.FieldLogger) error {
-	log.Infof("egressd: running init")
-	defer log.Infof("egressd: init done")
+	log.Infof("running init")
+	defer log.Infof("init done")
 
 	ciliumAvailable := conntrack.CiliumAvailable()
 	if !ciliumAvailable {
+		log.Info("init netfilter accounting")
 		if err := conntrack.InitNetfilterAccounting(); err != nil {
 			return fmt.Errorf("init nf conntrack: %w", err)
 		}
 	}
 
-	if err := ebpf.InitCgroupv2(); err != nil {
+	if err := ebpf.InitCgroupv2(log); err != nil {
 		return fmt.Errorf("init cgroupv2: %w", err)
 	}
 
