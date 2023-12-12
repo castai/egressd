@@ -38,6 +38,7 @@ spec:
       hostNetwork: {{ .Values.collector.hostNetwork }}
       securityContext:
         {{- toYaml .Values.collector.podSecurityContext | nindent 8 }}
+      {{- if not .Values.collector.skipInit }}
       initContainers:
         - name: egressd-init
           securityContext:
@@ -45,7 +46,10 @@ spec:
           image: "{{ .Values.collector.image.repository }}:{{ .Values.collector.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
           args:
-            - "-init"
+          - "-init"
+          {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
+          - "-init-cgroupv2"
+          {{- end }}
           env:
             - name: CGROUP2_MOUNT_PATH
               value: /cgroup2-manual-mount/cgroup2
@@ -60,6 +64,7 @@ spec:
             - mountPath: /cgroup2-manual-mount
               name: cgroup-mountdir
           {{- end }}
+      {{- end }}
       containers:
       - name: egressd
         securityContext:

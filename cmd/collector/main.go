@@ -45,7 +45,8 @@ var (
 	ebpfDNSTracerQueueSize = flag.Int("ebpf-dns-tracer-queue-size", 1000, "Size of the queue for DNS tracer")
 	// Kubernetes requires container to run in privileged mode if Bidirectional mount is used.
 	// Actually it needs only SYS_ADMIN but see this issue See https://github.com/kubernetes/kubernetes/pull/117812
-	initMode = flag.Bool("init", false, "Run in init mode to setup conntrack accounting and mount cgroup v2")
+	initMode     = flag.Bool("init", false, "Run in init mode")
+	initCgroupv2 = flag.Bool("init-cgroupv2", false, "Mount cgroup v2 if needed")
 )
 
 // These should be set via `go build` during a release.
@@ -219,8 +220,10 @@ func runInit(log logrus.FieldLogger) error {
 		}
 	}
 
-	if err := ebpf.InitCgroupv2(log); err != nil {
-		return fmt.Errorf("init cgroupv2: %w", err)
+	if *initCgroupv2 {
+		if err := ebpf.InitCgroupv2(log); err != nil {
+			return fmt.Errorf("init cgroupv2: %w", err)
+		}
 	}
 
 	return nil
