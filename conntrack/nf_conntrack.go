@@ -30,7 +30,7 @@ func InitNetfilterAccounting() error {
 func NewNetfilterClient(log logrus.FieldLogger) (Client, error) {
 	hostNs, err := netns.GetFromPid(1)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting host network namespace: %w", err)
 	}
 	nfct, err := ct.Open(&ct.Config{
 		NetNS: int(hostNs),
