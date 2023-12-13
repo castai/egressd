@@ -112,7 +112,7 @@ func run(log logrus.FieldLogger) error {
 	informersFactory.WaitForCacheSync(wait.NeverStop)
 
 	var conntracker conntrack.Client
-	ciliumAvailable := conntrack.CiliumAvailable("")
+	ciliumAvailable := conntrack.CiliumAvailable(*ctMode)
 	if ciliumAvailable {
 		log.Info("using cilium conntrack client")
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))

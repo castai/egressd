@@ -57,7 +57,7 @@ spec:
             - name: CGROUP2_MOUNT_PATH
               value: /cgroup2-manual-mount/cgroup2
           volumeMounts:
-          {{- if ne .Values.collector.ctMode "cilium"}}
+          {{- if ne .Values.collector.ctMode "cilium" }}
             - mountPath: /hostproc/sys/net/netfilter
               name: netfilter
               mountPropagation: Bidirectional
