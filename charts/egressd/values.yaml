@@ -38,23 +38,35 @@ collector:
     name: ""
 
   ## The name of the PriorityClass for collector pods
-  priorityClassName: "system-node-critical"
+  #priorityClassName: "system-node-critical"
 
   ## Annotations to be added to collector pod
   ##
   podAnnotations: { }
 
-
   ## Labels to be added to collector pod
   ##
   podLabels: { }
+
+  # If hostPID is used container should run in fully privileged mode. Then hostNetwork can be set to false.
+  hostPID: false
+  hostNetwork: true
 
   podSecurityContext: { }
   # fsGroup: 2000
 
   containerSecurityContext:
-    privileged: true
+    privileged: false
     readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - all
+      add:
+        - NET_ADMIN  # Needed for reading conntrack.
+        - SYS_PTRACE # Needed for reading conntrack.
+        - SYS_ADMIN  # Needed for reading conntrack and ebpf.
+        - BPF        # Needed for reading ebpf.
+        - PERFMON    # Needed for reading ebpf.
 
   resources:
     requests:
@@ -83,6 +95,10 @@ collector:
   prometheusScrape:
     enabled: true
 
+  # Skip privileged init container if netfilter accounting or cgroupv2 mount is not needed.
+  # Netfilter accounting is enabled by setting /proc/sys/net/netfilter/nf_conntrack_acct to 1. If this is already enabled on host it can be skipped.
+  # Cgroupv2 should be already mounted in recent k8s versions. It's required to track dns requests using eBPF.
+  skipInit: false
 
 exporter:
   image:
@@ -124,7 +140,7 @@ exporter:
 
 
   ## The name of the PriorityClass for exporter pods
-  priorityClassName: "system-node-critical"
+  #priorityClassName: "system-cluster-critical"
 
   ## Annotations to be added to exporter pod
   ##

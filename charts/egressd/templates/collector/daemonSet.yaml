@@ -34,9 +34,37 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "egressd.collector.serviceAccountName" . }}
-      hostNetwork: true
+      hostPID: {{ .Values.collector.hostPID }}
+      hostNetwork: {{ .Values.collector.hostNetwork }}
       securityContext:
         {{- toYaml .Values.collector.podSecurityContext | nindent 8 }}
+      {{- if not .Values.collector.skipInit }}
+      initContainers:
+        - name: egressd-init
+          securityContext:
+            privileged: true # See https://github.com/kubernetes/kubernetes/pull/117812
+          image: "{{ .Values.collector.image.repository }}:{{ .Values.collector.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.collector.image.pullPolicy }}
+          args:
+          - "-init"
+          {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
+          - "-init-cgroupv2"
+          {{- end }}
+          env:
+            - name: CGROUP2_MOUNT_PATH
+              value: /cgroup2-manual-mount/cgroup2
+          volumeMounts:
+            - mountPath: /hostproc/sys/net/netfilter
+              name: netfilter
+              mountPropagation: Bidirectional
+          {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
+            - mountPath: /sys/fs/cgroup
+              name: cgroup
+              mountPropagation: Bidirectional
+            - mountPath: /cgroup2-manual-mount
+              name: cgroup-mountdir
+          {{- end }}
+      {{- end }}
       containers:
       - name: egressd
         securityContext:
@@ -47,6 +75,9 @@ spec:
             {{- toYaml .Values.collector.resources | nindent 12 }}
         args:
         - "-http-listen-port={{.Values.collector.httpListenPort}}"
+        {{- if.Values.collector.hostPID }}
+        - "-host-pid"
+        {{- end }}
         {{- range $key, $value := .Values.collector.extraArgs }}
         - "-{{ $key }}={{ $value }}"
         {{- end }}
@@ -55,23 +86,14 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        - name: CGROUP2_MOUNT_PATH
-          value: /cgroup2-manual-mount/cgroup2
         volumeMounts:
         - mountPath: /sys/fs/bpf
           mountPropagation: HostToContainer
           name: cilium-bpf-maps
-        - mountPath: /var/run/egressd
-          name: export-logs
-        - mountPath: /hostproc/sys/net/netfilter
-          name: netfilter
-          mountPropagation: Bidirectional
         {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
         - mountPath: /sys/fs/cgroup
           name: cgroup
-          mountPropagation: Bidirectional
-        - mountPath: /cgroup2-manual-mount
-          name: cgroup-mountdir
+          readOnly: true
         {{- end }}
         ports:
         - containerPort: {{.Values.collector.httpListenPort}}
@@ -102,10 +124,6 @@ spec:
         - name: cilium-bpf-maps
           hostPath:
             path: /sys/fs/bpf
-            type: DirectoryOrCreate
-        - name: export-logs
-          hostPath:
-            path: /var/run/egressd
             type: DirectoryOrCreate
         - name: cgroup-mountdir
           emptyDir: {}

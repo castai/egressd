@@ -1,4 +1,7 @@
 collector:
+  hostPID: true
+  hostNetwork: true # On github actions we need host network to access kind host conntrack entries.
+
   image:
     repository: egressd
 
@@ -24,3 +27,6 @@ exporter:
       tilt_prom:
         prom_remote_write:
           url: "http://victoria-metrics-single-server:8428/api/v1/write"
+
+castai:
+  apiKey: "test"

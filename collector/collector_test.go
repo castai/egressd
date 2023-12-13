@@ -427,6 +427,9 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		err := proto.Unmarshal(w.Body.Bytes(), batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
+		sort.Slice(batch.Items, func(i, j int) bool {
+			return batch.Items[i].RxBytes < batch.Items[j].RxBytes
+		})
 
 		r.Len(batch.Ip2Domain, 1)
 		r.Equal("first-destination.example.com", batch.Ip2Domain[0].Domain)
@@ -511,6 +514,9 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		err := proto.Unmarshal(w.Body.Bytes(), batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
+		sort.Slice(batch.Items, func(i, j int) bool {
+			return batch.Items[i].RxBytes < batch.Items[j].RxBytes
+		})
 
 		r.Len(batch.Ip2Domain, 1)
 		r.Equal("first-destination.example.com", batch.Ip2Domain[0].Domain)

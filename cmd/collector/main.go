@@ -36,6 +36,7 @@ var (
 	readInterval           = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
 	cleanupInterval        = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
 	httpListenPort         = flag.Int("http-listen-port", 8008, "HTTP server listen port")
+	hostPid                = flag.Bool("host-pid", false, "Use host pid")
 	excludeNamespaces      = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
 	dumpCT                 = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
 	ciliumClockSource      = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
@@ -43,6 +44,10 @@ var (
 	sendTrafficDelta       = flag.Bool("send-traffic-delta", false, "Send traffic delta between reads of conntrack entry. Traffic counter is sent by default")
 	ebpfDNSTracerEnabled   = flag.Bool("ebpf-dns-tracer-enabled", true, "Enable DNS tracer using eBPF")
 	ebpfDNSTracerQueueSize = flag.Int("ebpf-dns-tracer-queue-size", 1000, "Size of the queue for DNS tracer")
+	// Kubernetes requires container to run in privileged mode if Bidirectional mount is used.
+	// Actually it needs only SYS_ADMIN but see this issue See https://github.com/kubernetes/kubernetes/pull/117812
+	initMode     = flag.Bool("init", false, "Run in init mode")
+	initCgroupv2 = flag.Bool("init-cgroupv2", false, "Mount cgroup v2 if needed")
 )
 
 // These should be set via `go build` during a release.
@@ -64,6 +69,13 @@ func main() {
 
 	if *dumpCT {
 		if err := dumpConntrack(log); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	if *initMode {
+		if err := runInit(log); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -99,9 +111,11 @@ func run(log logrus.FieldLogger) error {
 	var conntracker conntrack.Client
 	ciliumAvailable := conntrack.CiliumAvailable()
 	if ciliumAvailable {
+		log.Info("using cilium conntrack client")
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
 	} else {
-		conntracker, err = conntrack.NewNetfilterClient(log)
+		log.Info("using netfilter conntrack client")
+		conntracker, err = conntrack.NewNetfilterClient(log, *hostPid)
 	}
 	if err != nil {
 		return err
@@ -194,6 +208,28 @@ func run(log logrus.FieldLogger) error {
 	return <-errc
 }
 
+// runInit runs once in init container.
+func runInit(log logrus.FieldLogger) error {
+	log.Infof("running init")
+	defer log.Infof("init done")
+
+	ciliumAvailable := conntrack.CiliumAvailable()
+	if !ciliumAvailable {
+		log.Info("init netfilter accounting")
+		if err := conntrack.InitNetfilterAccounting(); err != nil {
+			return fmt.Errorf("init nf conntrack: %w", err)
+		}
+	}
+
+	if *initCgroupv2 {
+		if err := ebpf.InitCgroupv2(log); err != nil {
+			return fmt.Errorf("init cgroupv2: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func retrieveKubeConfig(log logrus.FieldLogger, kubepath string) (*rest.Config, error) {
 	if kubepath != "" {
 		data, err := os.ReadFile(kubepath)
@@ -236,7 +272,7 @@ func dumpConntrack(log logrus.FieldLogger) error {
 	if ciliumAvailable {
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
 	} else {
-		conntracker, err = conntrack.NewNetfilterClient(log)
+		conntracker, err = conntrack.NewNetfilterClient(log, *hostPid)
 	}
 	if err != nil {
 		return err
