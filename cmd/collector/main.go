@@ -36,6 +36,7 @@ var (
 	readInterval           = flag.Duration("read-interval", 5*time.Second, "Interval of time between reads of conntrack entry on the node")
 	cleanupInterval        = flag.Duration("cleanup-interval", 120*time.Second, "Interval of time for cleanup cached conntrack entries")
 	httpListenPort         = flag.Int("http-listen-port", 8008, "HTTP server listen port")
+	hostPid                = flag.Bool("host-pid", false, "Use host pid")
 	excludeNamespaces      = flag.String("exclude-namespaces", "kube-system", "Exclude namespaces from collections")
 	dumpCT                 = flag.Bool("dump-ct", false, "Only dump connection tracking entries to stdout and exit")
 	ciliumClockSource      = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
@@ -114,7 +115,7 @@ func run(log logrus.FieldLogger) error {
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
 	} else {
 		log.Info("using netfilter conntrack client")
-		conntracker, err = conntrack.NewNetfilterClient(log)
+		conntracker, err = conntrack.NewNetfilterClient(log, *hostPid)
 	}
 	if err != nil {
 		return err
@@ -271,7 +272,7 @@ func dumpConntrack(log logrus.FieldLogger) error {
 	if ciliumAvailable {
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
 	} else {
-		conntracker, err = conntrack.NewNetfilterClient(log)
+		conntracker, err = conntrack.NewNetfilterClient(log, *hostPid)
 	}
 	if err != nil {
 		return err

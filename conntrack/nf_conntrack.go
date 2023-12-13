@@ -27,10 +27,15 @@ func InitNetfilterAccounting() error {
 	return os.WriteFile(accounting, []byte{'1'}, 0600)
 }
 
-func NewNetfilterClient(log logrus.FieldLogger) (Client, error) {
-	hostNs, err := netns.GetFromPid(1)
-	if err != nil {
-		return nil, fmt.Errorf("getting host network namespace: %w", err)
+func NewNetfilterClient(log logrus.FieldLogger, hostPid bool) (Client, error) {
+	var hostNs netns.NsHandle
+	// If hostPid is used we can access host network namespace without the need to expose container to host network.
+	if hostPid {
+		var err error
+		hostNs, err = netns.GetFromPid(1)
+		if err != nil {
+			return nil, fmt.Errorf("getting host network namespace: %w", err)
+		}
 	}
 	nfct, err := ct.Open(&ct.Config{
 		NetNS: int(hostNs),

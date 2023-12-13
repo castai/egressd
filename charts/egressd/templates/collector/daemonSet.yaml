@@ -75,6 +75,9 @@ spec:
             {{- toYaml .Values.collector.resources | nindent 12 }}
         args:
         - "-http-listen-port={{.Values.collector.httpListenPort}}"
+        {{- if.Values.collector.hostPID }}
+        - "-host-pid"
+        {{- end }}
         {{- range $key, $value := .Values.collector.extraArgs }}
         - "-{{ $key }}={{ $value }}"
         {{- end }}
