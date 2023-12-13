@@ -50,13 +50,18 @@ spec:
           {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
           - "-init-cgroupv2"
           {{- end }}
+          {{- if .Values.collector.ctMode }}
+          - "-ct-mode={{ .Values.collector.ctMode }}"
+          {{- end }}
           env:
             - name: CGROUP2_MOUNT_PATH
               value: /cgroup2-manual-mount/cgroup2
           volumeMounts:
+          {{- if ne .Values.collector.ctMode "cilium"}}
             - mountPath: /hostproc/sys/net/netfilter
               name: netfilter
               mountPropagation: Bidirectional
+          {{- end }}
           {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
             - mountPath: /sys/fs/cgroup
               name: cgroup
@@ -78,6 +83,9 @@ spec:
         {{- if.Values.collector.hostPID }}
         - "-host-pid"
         {{- end }}
+        {{- if .Values.collector.ctMode }}
+        - "-ct-mode={{ .Values.collector.ctMode }}"
+        {{- end }}
         {{- range $key, $value := .Values.collector.extraArgs }}
         - "-{{ $key }}={{ $value }}"
         {{- end }}
@@ -87,9 +95,11 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         volumeMounts:
+        {{- if ne .Values.collector.ctMode "netfilter"}}
         - mountPath: /sys/fs/bpf
           mountPropagation: HostToContainer
           name: cilium-bpf-maps
+        {{- end }}
         {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
         - mountPath: /sys/fs/cgroup
           name: cgroup
@@ -113,18 +123,22 @@ spec:
           periodSeconds: 5
       dnsPolicy: {{.Values.collector.dnsPolicy}}
       volumes:
+        {{- if ne .Values.collector.ctMode "cilium"}}
         - name: netfilter
           hostPath:
             path: /proc/sys/net/netfilter
+        {{- end }}
         {{- if (get .Values.collector.extraArgs "ebpf-dns-tracer-enabled") }}
         - name: cgroup
           hostPath:
             path: /sys/fs/cgroup
         {{- end }}
+        {{- if ne .Values.collector.ctMode "netfilter"}}
         - name: cilium-bpf-maps
           hostPath:
             path: /sys/fs/bpf
             type: DirectoryOrCreate
+        {{- end }}
         - name: cgroup-mountdir
           emptyDir: {}
       {{- with .Values.collector.nodeSelector }}
@@ -139,4 +153,3 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-

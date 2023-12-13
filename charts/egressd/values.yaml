@@ -100,6 +100,9 @@ collector:
   # Cgroupv2 should be already mounted in recent k8s versions. It's required to track dns requests using eBPF.
   skipInit: false
 
+  # Explicitly set conntrack mode (netfilter,cilium)
+  ctMode: ""
+
 exporter:
   image:
     repository: ghcr.io/castai/egressd/egressd-exporter
@@ -188,5 +191,3 @@ exporter:
 
   prometheusScrape:
     enabled: true
-
-

@@ -48,6 +48,9 @@ var (
 	// Actually it needs only SYS_ADMIN but see this issue See https://github.com/kubernetes/kubernetes/pull/117812
 	initMode     = flag.Bool("init", false, "Run in init mode")
 	initCgroupv2 = flag.Bool("init-cgroupv2", false, "Mount cgroup v2 if needed")
+
+	// Explicitly allow to set conntrack client mode.
+	ctMode = flag.String("ct-mode", "", "Explicitly set conntract mode (netfilter,cilium)")
 )
 
 // These should be set via `go build` during a release.
@@ -109,7 +112,7 @@ func run(log logrus.FieldLogger) error {
 	informersFactory.WaitForCacheSync(wait.NeverStop)
 
 	var conntracker conntrack.Client
-	ciliumAvailable := conntrack.CiliumAvailable()
+	ciliumAvailable := conntrack.CiliumAvailable("")
 	if ciliumAvailable {
 		log.Info("using cilium conntrack client")
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
@@ -213,7 +216,7 @@ func runInit(log logrus.FieldLogger) error {
 	log.Infof("running init")
 	defer log.Infof("init done")
 
-	ciliumAvailable := conntrack.CiliumAvailable()
+	ciliumAvailable := conntrack.CiliumAvailable(*ctMode)
 	if !ciliumAvailable {
 		log.Info("init netfilter accounting")
 		if err := conntrack.InitNetfilterAccounting(); err != nil {
@@ -268,7 +271,7 @@ func dumpConntrack(log logrus.FieldLogger) error {
 	now := time.Now().UTC()
 	var err error
 	var conntracker conntrack.Client
-	ciliumAvailable := conntrack.CiliumAvailable()
+	ciliumAvailable := conntrack.CiliumAvailable("")
 	if ciliumAvailable {
 		conntracker, err = conntrack.NewCiliumClient(log, conntrack.ClockSource(*ciliumClockSource))
 	} else {

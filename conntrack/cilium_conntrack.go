@@ -13,7 +13,10 @@ func NewCiliumClient(log logrus.FieldLogger, clockSource ClockSource) (Client, e
 	}, nil
 }
 
-func CiliumAvailable() bool {
+func CiliumAvailable(mode string) bool {
+	if mode == "cilium" {
+		return true
+	}
 	return bpfMapsExist()
 }
 
