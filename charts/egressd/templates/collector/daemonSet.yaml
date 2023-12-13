@@ -132,6 +132,8 @@ spec:
         - name: cgroup
           hostPath:
             path: /sys/fs/cgroup
+        - name: cgroup-mountdir
+          emptyDir: { }
         {{- end }}
         {{- if ne .Values.collector.ctMode "netfilter"}}
         - name: cilium-bpf-maps
@@ -139,8 +141,6 @@ spec:
             path: /sys/fs/bpf
             type: DirectoryOrCreate
         {{- end }}
-        - name: cgroup-mountdir
-          emptyDir: {}
       {{- with .Values.collector.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
