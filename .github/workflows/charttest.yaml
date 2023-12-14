@@ -1,0 +1,45 @@
+name: ChartSync
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  CHART_PATH: "${{ github.workspace }}/charts/egressd"
+
+jobs:
+  release_chart:
+    name: Release Helm Chart
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: '0'
+
+      - name: Get release tag
+        run: echo "RELEASE_TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: Checkout helm-charts
+        # The cr tool only works if the target repository is already checked out
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: castai/helm-charts
+          path: helm-charts
+          token: ${{ secrets.HELM_CHARTS_REPO_TOKEN }}
+
+      - name: Sync chart to helm-charts github 
+        run: |
+          cd helm-charts
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git checkout egressd
+          echo "status before" && git status
+          cp -r ../charts .
+          echo "status after" && git status
+          # git add .
+          # git commit -m "[egressd] Update chart to ${{env.RELEASE_TAG}}"
+          # git push
+
