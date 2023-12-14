@@ -38,7 +38,7 @@ jobs:
           git checkout egressd
           echo "status before" && git status
           ls -l charts
-          cp -r ${CHART_PATH} egressd
+          cp -r ${CHART_PATH} ./charts/egressd
           echo "status after" && git status
           ls -l charts
           git add charts/egressd
