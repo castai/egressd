@@ -165,6 +165,7 @@ jobs:
           ls -l "${CR_PACKAGE_PATH}"
           git status
 
+
       - name: Make helm charts github release
         uses: softprops/action-gh-release@v1
         with:
@@ -192,3 +193,15 @@ jobs:
           git add ${CHART_PATH}/Chart.yaml
           git commit -m "[Release] Update Chart.yaml"
           git push
+
+      - name: Sync chart with helm-charts github 
+        run: |
+          cd helm-charts
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git checkout main
+          cp -r ${CHART_PATH} ./charts/egressd
+          git add charts/egressd
+          git commit -m "[egressd] Update egressd chart to ${{env.RELEASE_TAG}}"
+          git push
+
