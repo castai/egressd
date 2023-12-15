@@ -36,13 +36,10 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
           git checkout egressd
-          echo "status before" && git status
-          ls -l charts
+          git status
           cp -r ${CHART_PATH} ./charts/egressd
-          echo "status after" && git status
-          ls -l charts
+          git status
           git add charts/egressd
-          git commit -m "[egressd] Update chart to ${{env.RELEASE_TAG}}"
-          git log
-          # git push
+          git commit -m "[egressd] Update egressd chart to ${{env.RELEASE_TAG}}"
+          git push
 
