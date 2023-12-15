@@ -202,6 +202,6 @@ jobs:
           git checkout main
           cp -r ${CHART_PATH} ./charts/egressd
           git add charts/egressd
-          git commit -m "[egressd] Update egressd chart to ${{env.RELEASE_TAG}}"
+          git commit -m "Update egressd chart to ${{env.RELEASE_TAG}}"
           git push
 
