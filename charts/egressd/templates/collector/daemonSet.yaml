@@ -9,6 +9,12 @@ spec:
   selector:
     matchLabels:
       {{- include "egressd.selectorLabels" . | nindent 6 }}
+  updateStrategy:
+    {{- if eq .Values.collector.updateStrategy "RollingUpdate" }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.collector.maxUnavailable }}
+    {{- end }}
+    type: {{ .Values.collector.updateStrategy }}      
   template:
     metadata:
       annotations:
