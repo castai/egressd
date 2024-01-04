@@ -56,17 +56,18 @@ collector:
   # fsGroup: 2000
 
   containerSecurityContext:
-    privileged: false
+    privileged: true
     readOnlyRootFilesystem: true
-    capabilities:
-      drop:
-        - all
-      add:
-        - NET_ADMIN  # Needed for reading conntrack.
-        - SYS_PTRACE # Needed for reading conntrack.
-        - SYS_ADMIN  # Needed for reading conntrack and ebpf.
-        - BPF        # Needed for reading ebpf.
-        - PERFMON    # Needed for reading ebpf.
+    # If privileged is not allowed these capabilities can be set instead.
+#    capabilities:
+#      drop:
+#        - all
+#      add:
+#        - NET_ADMIN  # Needed for reading conntrack.
+#        - SYS_PTRACE # Needed for reading conntrack.
+#        - SYS_ADMIN  # Needed for reading conntrack and ebpf.
+#        - BPF        # Needed for reading ebpf.
+#        - PERFMON    # Needed for reading ebpf.
 
   resources:
     requests:
@@ -80,7 +81,15 @@ collector:
   tolerations:
     - operator: Exists
 
-  affinity: { }
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: eks.amazonaws.com/compute-type
+                operator: NotIn
+                values:
+                  - fargate
 
   dnsPolicy: ClusterFirstWithHostNet
 
