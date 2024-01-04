@@ -200,7 +200,7 @@ func run(log logrus.FieldLogger) error {
 	}()
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, context.Canceled) {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			err = fmt.Errorf("starting http server: %w", err)
 			log.Error(err.Error())
 			errc <- err
