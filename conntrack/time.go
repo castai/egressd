@@ -4,9 +4,7 @@
 package conntrack
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 
 	"github.com/cilium/cilium/pkg/datapath/linux/probes"
 	"golang.org/x/sys/unix"

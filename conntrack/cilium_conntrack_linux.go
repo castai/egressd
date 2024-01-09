@@ -17,8 +17,8 @@ import (
 
 // https://raw.githubusercontent.com/cilium/cilium/1324e2d3d2674b872461b21e030ef9d19fa591ae/pkg/defaults/defaults.go
 const (
-	bpfMapRoot = defaults.DefaultMapRoot
-	bpfMaps    = defaults.DefaultMapPrefix
+	bpfMapRoot = defaults.BPFFSRoot
+	bpfMaps    = defaults.TCGlobalsPath
 )
 
 func bpfMapsExist() bool {
