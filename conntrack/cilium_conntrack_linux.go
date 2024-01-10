@@ -15,7 +15,7 @@ import (
 	"inet.af/netaddr"
 )
 
-// https://raw.githubusercontent.com/cilium/cilium/1324e2d3d2674b872461b21e030ef9d19fa591ae/pkg/defaults/defaults.go
+// https://raw.githubusercontent.com/cilium/cilium/main/pkg/defaults/defaults.go
 const (
 	bpfMapRoot = defaults.BPFFSRoot
 	bpfMaps    = defaults.TCGlobalsPath
