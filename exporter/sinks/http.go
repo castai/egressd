@@ -105,7 +105,7 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 		Jitter:   0.2,
 		Steps:    3,
 	}
-	err = wait.ExponentialBackoffWithContext(ctx, backoff, func() (done bool, err error) {
+	err = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (done bool, err error) {
 		resp, err = s.httpClient.Do(req) //nolint:bodyclose
 		if err != nil {
 			s.log.Warnf("failed sending request: %v", err)

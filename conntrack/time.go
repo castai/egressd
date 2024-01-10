@@ -4,10 +4,9 @@
 package conntrack
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 
+	"github.com/cilium/cilium/pkg/datapath/linux/probes"
 	"golang.org/x/sys/unix"
 )
 
@@ -44,7 +43,7 @@ func kernelTimeDiffSecondsFunc(clockSource ClockSource) (func(t int64) int64, er
 			return t - int64(now)
 		}, nil
 	case ClockSourceJiffies:
-		now, err := getJtime()
+		now, err := probes.Jiffies()
 		if err != nil {
 			return nil, err
 		}
@@ -73,32 +72,4 @@ func getMtime() (uint64, error) {
 	}
 
 	return uint64(unix.TimespecToNsec(ts)), nil
-}
-
-const (
-	timerInfoFilepath = "/proc/timer_list"
-)
-
-// getJtime returns a close-enough approximation of kernel jiffies
-// that can be used to compare against jiffies BPF helper. We parse
-// it from /proc/timer_list. GetJtime() should be invoked only at
-// mid-low frequencies.
-func getJtime() (uint64, error) {
-	jiffies := uint64(0)
-	scaler := uint64(8)
-	timers, err := os.Open(timerInfoFilepath)
-	if err != nil {
-		return 0, err
-	}
-	defer timers.Close()
-	scanner := bufio.NewScanner(timers)
-	for scanner.Scan() {
-		tmp := uint64(0)
-		n, _ := fmt.Sscanf(scanner.Text(), "jiffies: %d\n", &tmp)
-		if n == 1 {
-			jiffies = tmp
-			break
-		}
-	}
-	return jiffies >> scaler, scanner.Err()
 }
