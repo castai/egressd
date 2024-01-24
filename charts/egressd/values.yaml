@@ -49,8 +49,8 @@ collector:
   podLabels: { }
 
   # If hostPID is used container should run in fully privileged mode. Then hostNetwork can be set to false.
-  hostPID: false
-  hostNetwork: true
+  hostPID: true
+  hostNetwork: false
 
   podSecurityContext: { }
   # fsGroup: 2000
