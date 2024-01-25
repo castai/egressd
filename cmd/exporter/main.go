@@ -101,7 +101,7 @@ func run(log logrus.FieldLogger) error {
 	podsInformer := informersFactory.Core().V1().Pods().Informer()
 	nodesInformer := informersFactory.Core().V1().Nodes().Informer()
 	podsByNodeCache := kube.NewPodsByNodeCache(podsInformer)
-	podByIPCache := kube.NewPodByIPCache(podsInformer)
+	podByIPCache := kube.NewPodByIPCache(ctx, podsInformer, log)
 	nodeByNameCache := kube.NewNodeByNameCache(nodesInformer)
 	nodeByIPCache := kube.NewNodeByIPCache(nodesInformer)
 	informersFactory.Start(wait.NeverStop)

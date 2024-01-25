@@ -1,9 +1,11 @@
 package kube
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,7 +117,7 @@ func TestWatcher(t *testing.T) {
 	podsInformer := informersFactory.Core().V1().Pods().Informer()
 	nodesInformer := informersFactory.Core().V1().Nodes().Informer()
 	podsByNodeCache := NewPodsByNodeCache(podsInformer)
-	podByIPCache := NewPodByIPCache(podsInformer)
+	podByIPCache := NewPodByIPCache(context.Background(), podsInformer, logrus.New())
 	nodeByNameCache := NewNodeByNameCache(nodesInformer)
 	nodeByIPCache := NewNodeByIPCache(nodesInformer)
 	informersFactory.Start(wait.NeverStop)
