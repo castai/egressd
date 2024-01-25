@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -139,7 +140,18 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if _, err := w.Write(batchBytes); err != nil {
+
+	writer, err := gzip.NewWriterLevel(w, gzip.BestCompression)
+	if err != nil {
+		c.log.Errorf("cannot create gzip writer: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer writer.Close()
+
+	w.Header().Add("Content-Encoding", "gzip")
+
+	if _, err := writer.Write(batchBytes); err != nil {
 		c.log.Errorf("write batch: %v", err)
 		return
 	}

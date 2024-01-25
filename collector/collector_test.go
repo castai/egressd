@@ -1,6 +1,8 @@
 package collector
 
 import (
+	"compress/gzip"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -424,7 +426,13 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		r.Equal(200, w.Code)
 
 		batch := &pb.RawNetworkMetricBatch{}
-		err := proto.Unmarshal(w.Body.Bytes(), batch)
+		gzreader, err := gzip.NewReader(w.Body)
+		r.NoError(err)
+
+		body, err := io.ReadAll(gzreader)
+		r.NoError(err)
+
+		err = proto.Unmarshal(body, batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
 		sort.Slice(batch.Items, func(i, j int) bool {
@@ -511,7 +519,14 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		r.Equal(200, w.Code)
 
 		batch := &pb.RawNetworkMetricBatch{}
-		err := proto.Unmarshal(w.Body.Bytes(), batch)
+
+		gzreader, err := gzip.NewReader(w.Body)
+		r.NoError(err)
+
+		body, err := io.ReadAll(gzreader)
+		r.NoError(err)
+
+		err = proto.Unmarshal(body, batch)
 		r.NoError(err)
 		r.Len(batch.Items, 2)
 		sort.Slice(batch.Items, func(i, j int) bool {
