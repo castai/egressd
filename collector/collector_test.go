@@ -422,7 +422,9 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		// scrape pods metrics and prepare them to be sent
-		coll.GetRawNetworkMetricsHandler(w, &http.Request{})
+		coll.GetRawNetworkMetricsHandler(w, &http.Request{Header: http.Header{
+			"Accept-Encoding": []string{"gzip"},
+		}})
 		r.Equal(200, w.Code)
 
 		batch := &pb.RawNetworkMetricBatch{}
@@ -515,7 +517,9 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		// scrape pods metrics and prepare them to be sent
-		coll.GetRawNetworkMetricsHandler(w, &http.Request{})
+		coll.GetRawNetworkMetricsHandler(w, &http.Request{Header: http.Header{
+			"Accept-Encoding": []string{"gzip"},
+		}})
 		r.Equal(200, w.Code)
 
 		batch := &pb.RawNetworkMetricBatch{}

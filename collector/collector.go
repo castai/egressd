@@ -23,6 +23,11 @@ import (
 	"github.com/castai/egressd/pb"
 )
 
+var (
+	acceptEncoding  = http.CanonicalHeaderKey("Accept-Encoding")
+	contentEncoding = http.CanonicalHeaderKey("Content-Encoding")
+)
+
 func CurrentTimeGetter() func() time.Time {
 	return func() time.Time {
 		return time.Now()
@@ -141,20 +146,19 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 		return
 	}
 
-	writer, err := gzip.NewWriterLevel(w, gzip.BestCompression)
-	if err != nil {
-		c.log.Errorf("cannot create gzip writer: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	enc := req.Header.Get(acceptEncoding)
+	if strings.Contains(strings.ToLower(enc), "gzip") {
+		if err := c.writeGzipBody(w, batchBytes); err != nil {
+			c.log.Errorf("write batch %v", err)
+			return
+		}
+	} else {
+		if err := c.writePlainBody(w, batchBytes); err != nil {
+			c.log.Errorf("write batch %v", err)
+			return
+		}
 	}
-	defer writer.Close()
 
-	w.Header().Add("Content-Encoding", "gzip")
-
-	if _, err := writer.Write(batchBytes); err != nil {
-		c.log.Errorf("write batch: %v", err)
-		return
-	}
 	if c.cfg.SendTrafficDelta {
 		// reset metric tx/rx values, so only delta numbers will be sent with the next batch
 		for _, m := range c.podMetrics {
@@ -164,6 +168,32 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 			m.RawNetworkMetric.RxPackets = 0
 		}
 	}
+}
+
+func (c *Collector) writeGzipBody(w http.ResponseWriter, body []byte) error {
+	writer, err := gzip.NewWriterLevel(w, gzip.BestCompression)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return fmt.Errorf("cannot create gzip writer: %w", err)
+	}
+	defer writer.Close()
+
+	w.Header().Add(contentEncoding, "gzip")
+
+	if _, err := writer.Write(body); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return err
+	}
+
+	return nil
+}
+
+func (c *Collector) writePlainBody(w http.ResponseWriter, body []byte) error {
+	if _, err := w.Write(body); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return err
+	}
+	return nil
 }
 
 // collect aggregates conntract records into reduced pod metrics.
