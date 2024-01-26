@@ -3,10 +3,7 @@ package kube
 import (
 	"errors"
 	"fmt"
-	"sort"
-	"time"
 
-	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -21,8 +18,6 @@ const (
 var (
 	ErrNotFound      = errors.New("object not found")
 	ErrToManyObjects = errors.New("too many objects")
-
-	exitedPodTimeout = 1 * time.Minute
 )
 
 func NewPodsByNodeCache(informer cache.SharedIndexInformer) *PodsByNodeCache {
@@ -60,70 +55,6 @@ func (p *PodsByNodeCache) Get(nodeName string) ([]*corev1.Pod, error) {
 		res[i] = pod.(*corev1.Pod)
 	}
 	return res, nil
-}
-
-func NewPodByIPCache(informer cache.SharedIndexInformer) *PodByIPCache {
-	if err := informer.SetTransform(defaultTransformFunc); err != nil {
-		panic(err)
-	}
-	if err := informer.AddIndexers(map[string]cache.IndexFunc{
-		podIPIdx: func(obj interface{}) ([]string, error) {
-			switch t := obj.(type) {
-			case *corev1.Pod:
-				if t.Status.Phase == corev1.PodRunning {
-					return []string{t.Status.PodIP}, nil
-				}
-				if t.Status.Phase == corev1.PodSucceeded || t.Status.Phase == corev1.PodFailed {
-					if podExitedBeforeTimeout(t) {
-						return []string{t.Status.PodIP}, nil
-					}
-				}
-				return []string{}, nil
-			}
-			return nil, fmt.Errorf("expected pod, got unknown type %T", obj)
-		},
-	}); err != nil {
-		panic(err)
-	}
-	return &PodByIPCache{informer: informer}
-}
-
-func podExitedBeforeTimeout(t *corev1.Pod) bool {
-	podReady, found := lo.Find(t.Status.Conditions, func(c corev1.PodCondition) bool {
-		return c.Type == corev1.PodReady
-	})
-	deadLine := time.Now().UTC().Add(-exitedPodTimeout)
-	return found && podReady.LastTransitionTime.UTC().After(deadLine)
-}
-
-type PodByIPCache struct {
-	informer cache.SharedIndexInformer
-}
-
-func (p *PodByIPCache) Get(ip string) (*corev1.Pod, error) {
-	items, err := p.informer.GetIndexer().ByIndex(podIPIdx, ip)
-	if err != nil {
-		return nil, err
-	}
-	if len(items) == 0 {
-		return nil, ErrNotFound
-	}
-	pods := lo.FilterMap(items, func(item interface{}, i int) (*corev1.Pod, bool) {
-		pod, ok := item.(*corev1.Pod)
-		if !ok {
-			return nil, false
-		}
-		return pod, true
-	})
-	sort.SliceStable(pods, func(i, j int) bool {
-		return pods[i].CreationTimestamp.Before(&pods[j].CreationTimestamp)
-	})
-	for i := range pods {
-		if pod := pods[i]; pod != nil {
-			return pod, nil
-		}
-	}
-	return nil, ErrNotFound
 }
 
 func NewNodeByNameCache(informer cache.SharedIndexInformer) *NodeByNameCache {
