@@ -157,7 +157,10 @@ func (e *Exporter) export(ctx context.Context) error {
 			podMetrics, err := e.buildPodNetworkMetric(rawMetrics)
 			if err != nil {
 				if errors.Is(err, kube.ErrNotFound) {
-					e.log.Warnf("skipping pod metrics: %v", err)
+					// log warning only if metrics contain any data
+					if !e.emptyMetrics(rawMetrics) {
+						e.log.Warnf("skipping pod metrics: %v", err)
+					}
 				} else {
 					e.log.Errorf("init pod network metrics: %v", err)
 				}
@@ -185,6 +188,10 @@ func (e *Exporter) export(ctx context.Context) error {
 		return err
 	}
 	return err
+}
+
+func (e *Exporter) emptyMetrics(metrics *pb.RawNetworkMetric) bool {
+	return metrics.TxBytes == 0 && metrics.RxBytes == 0 && metrics.TxPackets == 0 && metrics.RxPackets == 0
 }
 
 func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetworkMetric, error) {
