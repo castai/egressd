@@ -122,6 +122,7 @@ func TestCollector(t *testing.T) {
 			RxBytes:   30,
 			RxPackets: 1,
 			Proto:     6,
+			Lifetime:  "0001-01-01T00:00:00Z",
 		}, items[0])
 
 		r.Equal(&pb.RawNetworkMetric{
@@ -132,6 +133,7 @@ func TestCollector(t *testing.T) {
 			RxBytes:   0,
 			RxPackets: 0,
 			Proto:     17,
+			Lifetime:  "0001-01-01T00:00:00Z",
 		}, items[1])
 	})
 
@@ -247,6 +249,7 @@ func TestCollector(t *testing.T) {
 			RxBytes:   0,
 			RxPackets: 0,
 			Proto:     6,
+			Lifetime:  "0001-01-01T00:00:00Z",
 		})
 
 		r.Contains(items, &pb.RawNetworkMetric{
@@ -257,6 +260,7 @@ func TestCollector(t *testing.T) {
 			RxBytes:   0,
 			RxPackets: 0,
 			Proto:     6,
+			Lifetime:  "0001-01-01T00:00:00Z",
 		})
 	})
 

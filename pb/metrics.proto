@@ -10,6 +10,7 @@ message RawNetworkMetric {
   int64 rx_bytes = 5;
   int64 rx_packets = 6;
   int32 proto = 7;
+  string lifetime = 8;
 }
 
 message RawNetworkMetricBatch {

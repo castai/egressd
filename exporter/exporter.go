@@ -156,6 +156,7 @@ func (e *Exporter) export(ctx context.Context) error {
 		for _, rawMetrics := range batch.Items {
 			podMetrics, err := e.buildPodNetworkMetric(rawMetrics)
 			if err != nil {
+				e.log.Infof("processing metrics: %d %d %s", rawMetrics.SrcIp, rawMetrics.DstIp, rawMetrics.Lifetime)
 				if errors.Is(err, kube.ErrNotFound) {
 					e.log.Warnf("skipping pod metrics: %v", err)
 				} else {
