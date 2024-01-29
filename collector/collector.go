@@ -167,7 +167,7 @@ func (c *Collector) GetRawNetworkMetricsHandler(w http.ResponseWriter, req *http
 			m.RawNetworkMetric.TxPackets = 0
 			m.RawNetworkMetric.RxPackets = 0
 
-			newLifetime := time.Now().Add(2 * time.Minute)
+			newLifetime := time.Now().Add(30 * time.Second)
 			// reset lifetime only if current lifetime is longer than 2 minutes from now
 			if m.lifetime.After(newLifetime) {
 				m.lifetime = newLifetime
