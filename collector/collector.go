@@ -213,6 +213,7 @@ func (c *Collector) collect() error {
 	defer c.mu.Unlock()
 
 	for _, conn := range conns {
+		c.log.Infof("connection lifecycle %s %s", conn.Src.IP().String(), conn.Lifetime.Format(time.RFC3339))
 		if c.cfg.GroupPublicIPs && !conn.Dst.IP().IsPrivate() {
 			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
 		}
@@ -244,13 +245,13 @@ func (c *Collector) collect() error {
 		} else {
 			c.podMetrics[groupKey] = &rawNetworkMetric{
 				RawNetworkMetric: &pb.RawNetworkMetric{
-					SrcIp:      dns.ToIPint32(conn.Src.IP()),
-					DstIp:      dns.ToIPint32(conn.Dst.IP()),
-					TxBytes:    int64(conn.TxBytes),
-					TxPackets:  int64(conn.TxPackets),
-					RxBytes:    int64(conn.RxBytes),
-					RxPackets:  int64(conn.RxPackets),
-					Proto:      int32(conn.Proto),
+					SrcIp:     dns.ToIPint32(conn.Src.IP()),
+					DstIp:     dns.ToIPint32(conn.Dst.IP()),
+					TxBytes:   int64(conn.TxBytes),
+					TxPackets: int64(conn.TxPackets),
+					RxBytes:   int64(conn.RxBytes),
+					RxPackets: int64(conn.RxPackets),
+					Proto:     int32(conn.Proto),
 				},
 				lifetime: conn.Lifetime,
 			}
