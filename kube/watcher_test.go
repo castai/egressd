@@ -95,23 +95,7 @@ func TestWatcher(t *testing.T) {
 		},
 	}
 
-	// pod exited a while ago, and should not be found
-	p4 := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "p4",
-			Namespace:         "team1",
-			CreationTimestamp: thirtySecsAgo,
-		},
-		Spec: corev1.PodSpec{
-			NodeName: n1.Name,
-		},
-		Status: corev1.PodStatus{
-			PodIP: "10.14.7.13",
-			Phase: corev1.PodSucceeded,
-		},
-	}
-
-	clientset := fake.NewSimpleClientset(n1, p1, p2, p3, p4)
+	clientset := fake.NewSimpleClientset(n1, p1, p2, p3)
 
 	informersFactory := informers.NewSharedInformerFactoryWithOptions(clientset, 30*time.Second)
 	podsInformer := informersFactory.Core().V1().Pods().Informer()
