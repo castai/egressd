@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/castai/promwrite"
 	"github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 
 	"github.com/castai/egressd/exporter/config"
 	"github.com/castai/egressd/pb"
+	"github.com/castai/promwrite"
 )
 
 type promWriter interface {
@@ -25,6 +25,7 @@ func NewPromRemoteWriteSink(log logrus.FieldLogger, sinkName string, cfg config.
 		}),
 		client:     promwrite.NewClient(cfg.URL),
 		timeGetter: timeGetter,
+		cfg:        cfg,
 	}
 }
 
