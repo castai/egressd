@@ -155,7 +155,7 @@ jobs:
           ls ./charts/egressd/egressd
           rm -rf ./charts/egressd/egressd
           echo "start cp"
-          cp -r ${CHART_PATH}/* ./charts/egressd
+          cp -r ${CHART_PATH}/ ./charts/egressd
           ls ./charts/egressd
 
   e2e:
