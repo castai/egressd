@@ -148,13 +148,15 @@ jobs:
       - name: Ciprian test - 2 - test chart sync
         run: |
           cd helm-charts
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
           git checkout main
           echo "chart path: ${CHART_PATH}"
           ls ${CHART_PATH}
           pwd
-          echo "finish"
+          ls ./charts/egressd/egressd
+          rm -rf ./charts/egressd/egressd
+          echo "start cp"
+          cp -r ${CHART_PATH}/* ./charts/egressd
+          ls ./charts/egressd
 
   e2e:
     name: E2E
