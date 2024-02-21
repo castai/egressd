@@ -165,3 +165,22 @@ jobs:
         shell: bash
         run: |
           KIND_CONTEXT=e2e IMAGE_TAG=${{ github.sha }} ./e2e/run.sh
+
+      - name: Ciprian test - Checkout helm-charts
+        # The cr tool only works if the target repository is already checked out
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: castai/helm-charts
+          path: helm-charts
+          token: ${{ secrets.HELM_CHARTS_REPO_TOKEN }}
+
+      - name: Ciprian test - test chart sync
+        run: |
+          cd helm-charts
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git checkout main
+          rm -rf charts/egressd/*
+          cp -r ${CHART_PATH}/* ./charts/egressd
+          ls -R
