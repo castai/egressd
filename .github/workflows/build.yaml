@@ -133,7 +133,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/castai/egressd/egressd-exporter:${{ github.sha }}
 
-      - name: Ciprian test - Checkout helm-charts
+      - name: Ciprian test - 1 - Checkout helm-charts
         # The cr tool only works if the target repository is already checked out
         uses: actions/checkout@v2
         with:
@@ -142,15 +142,18 @@ jobs:
           path: helm-charts
           token: ${{ secrets.HELM_CHARTS_REPO_TOKEN }}
 
-      - name: Ciprian test - test chart sync
+      - name: Ciprian test - 2 - test chart sync
         run: |
           cd helm-charts
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
           git checkout main
+          echo "before sync"
+          ls -r  ./charts/egressd
           rm -rf ./charts/egressd/*
           cp -r ${CHART_PATH}/* ./charts/egressd
-          ls -R ./charts/egressd
+          echo "after sync"
+          ls -r ./charts/egressd
 
   e2e:
     name: E2E
