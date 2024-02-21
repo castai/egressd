@@ -261,7 +261,7 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 }
 
 func (e *Exporter) fetchRawNetworkMetricsBatch(ctx context.Context, url string) (*pb.RawNetworkMetricBatch, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/v1/raw-network-metrics", url), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+"/api/v1/raw-network-metrics", nil)
 	if err != nil {
 		return nil, err
 	}

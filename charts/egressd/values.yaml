@@ -32,27 +32,27 @@ collector:
     # Specifies whether a service account should be created
     create: true
     # Annotations to add to the service account
-    annotations: { }
+    annotations: {}
     # The name of the service account to use.
     # If not set and create is true, a name is generated using the fullname template
     name: ""
 
   ## The name of the PriorityClass for collector pods
-  #priorityClassName: "system-node-critical"
+  # priorityClassName: "system-node-critical"
 
   ## Annotations to be added to collector pod
   ##
-  podAnnotations: { }
+  podAnnotations: {}
 
   ## Labels to be added to collector pod
   ##
-  podLabels: { }
+  podLabels: {}
 
   # If hostPID is used container should run in fully privileged mode. Then hostNetwork can be set to false.
   hostPID: true
   hostNetwork: false
 
-  podSecurityContext: { }
+  podSecurityContext: {}
   # fsGroup: 2000
 
   containerSecurityContext:
@@ -76,7 +76,7 @@ collector:
     limits:
       memory: 1Gi
 
-  nodeSelector: { }
+  nodeSelector: {}
 
   tolerations:
     - operator: Exists
@@ -145,23 +145,23 @@ exporter:
     # Specifies whether a service account should be created
     create: true
     # Annotations to add to the service account
-    annotations: { }
+    annotations: {}
     # The name of the service account to use.
     # If not set and create is true, a name is generated using the fullname template
     name: ""
 
 
   ## The name of the PriorityClass for exporter pods
-  #priorityClassName: "system-cluster-critical"
+  # priorityClassName: "system-cluster-critical"
 
   ## Annotations to be added to exporter pod
   ##
-  podAnnotations: { }
+  podAnnotations: {}
 
 
   ## Labels to be added to exporter pod
   ##
-  podLabels: { }
+  podLabels: {}
 
   podSecurityContext:
     fsGroup: 10001
@@ -175,7 +175,7 @@ exporter:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     capabilities:
-      drop: [ ALL ]
+      drop: [ALL]
 
   resources:
     requests:
@@ -184,11 +184,11 @@ exporter:
     limits:
       memory: 512Mi
 
-  nodeSelector: { }
+  nodeSelector: {}
 
-  tolerations: [ ]
+  tolerations: []
 
-  affinity: { }
+  affinity: {}
 
   dnsPolicy: ClusterFirstWithHostNet
 

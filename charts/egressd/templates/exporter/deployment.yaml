@@ -72,8 +72,6 @@ spec:
               name: {{ .Values.castai.apiKeySecretRef }}
               key: API_KEY
               {{- end }}
-        {{- else }}
-          {{- fail "apiKey or apiKeySecretRef must be provided" }}
         {{- end }}
         ports:
         - name: http-server
