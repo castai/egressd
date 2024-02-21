@@ -148,12 +148,9 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
           git checkout main
-          echo "before sync"
-          ls -R  ./charts/egressd
-          rm -rf ./charts/egressd/*
-          cp -r ${CHART_PATH}/* ./charts/egressd
-          echo "after sync"
+          echo "chart path: ${CHART_PATH}"
           pwd
+          echo "finish"
 
   e2e:
     name: E2E
