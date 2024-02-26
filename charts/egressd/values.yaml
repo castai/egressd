@@ -50,7 +50,7 @@ collector:
 
   # If hostPID is used container should run in fully privileged mode. Then hostNetwork can be set to false.
   hostPID: true
-  hostNetwork: false
+  hostNetwork: true
 
   podSecurityContext: {}
   # fsGroup: 2000
