@@ -1,11 +1,11 @@
 module github.com/castai/egressd
 
-go 1.20
+go 1.21
 
 require (
 	github.com/Code-Hex/go-generics-cache v1.3.1
 	github.com/castai/promwrite v0.5.0
-	github.com/cilium/cilium v1.14.5
+	github.com/cilium/cilium v1.14.7
 	github.com/cilium/ebpf v0.10.1-0.20230626090016-654491c8a500
 	github.com/florianl/go-conntrack v0.4.0
 	github.com/google/gopacket v1.1.19
