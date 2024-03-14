@@ -1,6 +1,8 @@
 module github.com/castai/egressd
 
-go 1.21
+go 1.21.0
+
+toolchain go1.21.6
 
 require (
 	github.com/Code-Hex/go-generics-cache v1.3.1
