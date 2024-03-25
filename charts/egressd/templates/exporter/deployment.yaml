@@ -65,12 +65,16 @@ spec:
         - name: API_KEY
           valueFrom:
             secretKeyRef:
-              {{- if .Values.castai.apiKey }}
-              name: "{{- include "egressd.fullname" . }}"
-              key: API_KEY
-              {{- else if  .Values.castai.apiKeySecretRef }}
-              name: {{ .Values.castai.apiKeySecretRef }}
-              key: API_KEY
+              {{- if eq (get .Values.collector.extraArgs "send-traffic-delta") false }}
+                {{- fail "`collector.extraArgs.send-traffic-delta` should be set to `true` when CAST AI is used as sink" }}
+              {{- else }}
+                {{- if .Values.castai.apiKey }}
+                name: "{{- include "egressd.fullname" . }}"
+                key: API_KEY
+                {{- else if  .Values.castai.apiKeySecretRef }}
+                name: {{ .Values.castai.apiKeySecretRef }}
+                key: API_KEY
+                {{- end }}
               {{- end }}
         {{- end }}
         ports:
