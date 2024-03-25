@@ -1,6 +1,8 @@
 module github.com/castai/egressd
 
-go 1.21
+go 1.21.0
+
+toolchain go1.21.6
 
 require (
 	github.com/Code-Hex/go-generics-cache v1.3.1
@@ -18,7 +20,7 @@ require (
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.15.0
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
 	inet.af/netaddr v0.0.0-20220811202034-502d2d690317
 	k8s.io/api v0.27.6
