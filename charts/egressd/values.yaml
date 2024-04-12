@@ -100,6 +100,7 @@ collector:
     group-public-ips: true
     send-traffic-delta: true
     ebpf-dns-tracer-enabled: false
+    # log-level: info
 
   prometheusScrape:
     enabled: true
@@ -121,8 +122,6 @@ exporter:
 
   # Exporter global configuration in yaml format. All values could be overridden with environment values.
   config: |
-    log:
-      level: "debug"
     sinks:
     {{- if or .Values.castai.apiKey .Values.castai.apiKeySecretRef }}
       castai:
@@ -196,6 +195,7 @@ exporter:
 
   # Extra args for egressd container.
   extraArgs:
+  # log-level: info
   # metric-buffer-size: 10000
 
   prometheusScrape:
