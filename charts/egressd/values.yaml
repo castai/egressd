@@ -100,7 +100,7 @@ collector:
     group-public-ips: true
     send-traffic-delta: true
     ebpf-dns-tracer-enabled: false
-    # log-level: info
+    log-level: info
 
   prometheusScrape:
     enabled: true
@@ -195,7 +195,7 @@ exporter:
 
   # Extra args for egressd container.
   extraArgs:
-  # log-level: info
+    log-level: info
   # metric-buffer-size: 10000
 
   prometheusScrape:
