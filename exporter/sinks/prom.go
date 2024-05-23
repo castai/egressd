@@ -53,16 +53,16 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 		}
 		labels := []promwrite.Label{
 			{Name: "__name__", Value: "egressd_transmit_bytes_total"},
-			{Name: "src_pod", Value: m.SrcPod},
-			{Name: "src_node", Value: m.SrcNode},
-			{Name: "src_namespace", Value: m.SrcNamespace},
-			{Name: "src_zone", Value: m.SrcZone},
-			{Name: "src_ip", Value: m.SrcIp},
+			{Name: "src_pod", Value: ensureNonEmpty(m.SrcPod)},
+			{Name: "src_node", Value: ensureNonEmpty(m.SrcNode)},
+			{Name: "src_namespace", Value: ensureNonEmpty(m.SrcNamespace)},
+			{Name: "src_zone", Value: ensureNonEmpty(m.SrcZone)},
+			{Name: "src_ip", Value: ensureNonEmpty(m.SrcIp)},
 
-			{Name: "dst_pod", Value: m.DstPod},
-			{Name: "dst_node", Value: m.DstNode},
-			{Name: "dst_namespace", Value: m.DstNamespace},
-			{Name: "dst_zone", Value: m.DstZone},
+			{Name: "dst_pod", Value: ensureNonEmpty(m.DstPod)},
+			{Name: "dst_node", Value: ensureNonEmpty(m.DstNode)},
+			{Name: "dst_namespace", Value: ensureNonEmpty(m.DstNamespace)},
+			{Name: "dst_zone", Value: ensureNonEmpty(m.DstZone)},
 			{Name: "dst_ip", Value: dstIP.String()},
 			{Name: "dst_ip_type", Value: dstIPType},
 			{Name: "cross_zone", Value: isCrossZoneValue(m)},
@@ -87,6 +87,13 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 		TimeSeries: ts,
 	}, promwrite.WriteHeaders(s.cfg.Headers))
 	return err
+}
+
+func ensureNonEmpty(value string) string {
+	if value == "" {
+		return "unknown"
+	}
+	return value
 }
 
 func isCrossZoneValue(m *pb.PodNetworkMetric) string {
