@@ -2,6 +2,7 @@ package sinks
 
 import (
 	"context"
+	"sort"
 	"testing"
 	"time"
 
@@ -58,28 +59,32 @@ func TestPromSink(t *testing.T) {
 	}
 	r.NoError(sink.Push(ctx, batch))
 
+	expectedLabels := []promwrite.Label{
+		{Name: "__name__", Value: "egressd_transmit_bytes_total"},
+		{Name: "src_pod", Value: "p1"},
+		{Name: "src_node", Value: "n1"},
+		{Name: "src_namespace", Value: "team1"},
+		{Name: "src_zone", Value: "us-east-1a"},
+		{Name: "src_ip", Value: "10.14.7.12"},
+		{Name: "dst_pod", Value: "p2"},
+		{Name: "dst_node", Value: "n1"},
+		{Name: "dst_namespace", Value: "team2"},
+		{Name: "dst_zone", Value: "us-east-1a"},
+		{Name: "dst_ip", Value: "10.14.7.5"},
+		{Name: "dst_ip_type", Value: "private"},
+		{Name: "cross_zone", Value: "false"},
+		{Name: "proto", Value: "TCP"},
+	}
+	sort.Slice(expectedLabels, func(i, j int) bool {
+		return expectedLabels[i].Name < expectedLabels[j].Name
+	})
+
 	r.Equal([]promwrite.TimeSeries{
 		{
-			Labels: []promwrite.Label{
-				{Name: "__name__", Value: "egressd_transmit_bytes_total"},
-				{Name: "src_pod", Value: "p1"},
-				{Name: "src_node", Value: "n1"},
-				{Name: "src_namespace", Value: "team1"},
-				{Name: "src_zone", Value: "us-east-1a"},
-				{Name: "src_ip", Value: "10.14.7.12"},
-				{Name: "dst_pod", Value: "p2"},
-				{Name: "dst_node", Value: "n1"},
-				{Name: "dst_namespace", Value: "team2"},
-				{Name: "dst_zone", Value: "us-east-1a"},
-				{Name: "dst_ip", Value: "10.14.7.5"},
-				{Name: "dst_ip_type", Value: "private"},
-				{Name: "cross_zone", Value: "false"},
-				{Name: "proto", Value: "TCP"},
-			},
+			Labels: expectedLabels,
 			Sample: promwrite.Sample{Time: ts, Value: 35},
 		},
-	},
-		client.req.TimeSeries)
+	}, client.req.TimeSeries)
 }
 
 type mockPromWriteClient struct {

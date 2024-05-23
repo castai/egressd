@@ -2,6 +2,7 @@ package sinks
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"time"
 
@@ -50,25 +51,29 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 		if dstIP.IsPrivate() {
 			dstIPType = "private"
 		}
+		labels := []promwrite.Label{
+			{Name: "__name__", Value: "egressd_transmit_bytes_total"},
+			{Name: "src_pod", Value: m.SrcPod},
+			{Name: "src_node", Value: m.SrcNode},
+			{Name: "src_namespace", Value: m.SrcNamespace},
+			{Name: "src_zone", Value: m.SrcZone},
+			{Name: "src_ip", Value: m.SrcIp},
+
+			{Name: "dst_pod", Value: m.DstPod},
+			{Name: "dst_node", Value: m.DstNode},
+			{Name: "dst_namespace", Value: m.DstNamespace},
+			{Name: "dst_zone", Value: m.DstZone},
+			{Name: "dst_ip", Value: dstIP.String()},
+			{Name: "dst_ip_type", Value: dstIPType},
+			{Name: "cross_zone", Value: isCrossZoneValue(m)},
+
+			{Name: "proto", Value: protoString(uint8(m.Proto))},
+		}
+		sort.Slice(labels, func(i, j int) bool {
+			return labels[i].Name < labels[j].Name
+		})
 		ts = append(ts, promwrite.TimeSeries{
-			Labels: []promwrite.Label{
-				{Name: "__name__", Value: "egressd_transmit_bytes_total"},
-				{Name: "src_pod", Value: m.SrcPod},
-				{Name: "src_node", Value: m.SrcNode},
-				{Name: "src_namespace", Value: m.SrcNamespace},
-				{Name: "src_zone", Value: m.SrcZone},
-				{Name: "src_ip", Value: m.SrcIp},
-
-				{Name: "dst_pod", Value: m.DstPod},
-				{Name: "dst_node", Value: m.DstNode},
-				{Name: "dst_namespace", Value: m.DstNamespace},
-				{Name: "dst_zone", Value: m.DstZone},
-				{Name: "dst_ip", Value: dstIP.String()},
-				{Name: "dst_ip_type", Value: dstIPType},
-				{Name: "cross_zone", Value: isCrossZoneValue(m)},
-
-				{Name: "proto", Value: protoString(uint8(m.Proto))},
-			},
+			Labels: labels,
 			Sample: promwrite.Sample{
 				Time:  now,
 				Value: float64(m.TxBytes),
