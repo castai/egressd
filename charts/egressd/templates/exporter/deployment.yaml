@@ -56,6 +56,11 @@ spec:
         - "-{{ $key }}"
         {{- end }}
         {{- end }}
+        {{- range $key, $value := .Values.exporter.extraLabels }}
+        {{- if and $value $key }}
+        - "-extra-label={{ $key }}={{ $value }}"
+        {{- end }}
+        {{- end }}
         env:
         - name: POD_NAMESPACE
           valueFrom:

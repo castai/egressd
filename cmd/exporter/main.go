@@ -34,6 +34,7 @@ var (
 	logLevel       = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
 	httpListenPort = flag.Int("http-listen-port", 6060, "HTTP server listen port")
 	configPath     = flag.String("config-path", "/etc/egressd/config/config.yaml", "Path to exporter config path")
+	extraLabels    = make(sinks.ExtraLabels)
 )
 
 // These should be set via `go build` during a release.
@@ -44,6 +45,7 @@ var (
 )
 
 func main() {
+	flag.Var(&extraLabels, "extra-label", "key=value pairs to set labels")
 	flag.Parse()
 
 	log := logrus.New()
@@ -130,7 +132,7 @@ func run(log logrus.FieldLogger) error {
 			))
 		} else if s.PromRemoteWriteConfig != nil {
 			sinksList = append(sinksList, sinks.NewPromRemoteWriteSink(
-				log, name, *s.PromRemoteWriteConfig,
+				log, name, *s.PromRemoteWriteConfig, extraLabels,
 			))
 		}
 	}

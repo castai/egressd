@@ -198,5 +198,9 @@ exporter:
     log-level: info
   # metric-buffer-size: 10000
 
+  # Extra labels to pass along when using the Prometheus Remote-Write sink
+  extraLabels: {}
+  # mylabel: myvalue
+
   prometheusScrape:
     enabled: true
