@@ -48,6 +48,7 @@ type Config struct {
 	// SendTrafficDelta used to determines if traffic should be sent as delta of 2 consecutive conntrack entries
 	// or as the constantly growing counter value
 	SendTrafficDelta bool
+	LogEntries       bool
 }
 
 type podsWatcher interface {
@@ -219,6 +220,16 @@ func (c *Collector) collect() error {
 	defer c.mu.Unlock()
 
 	for _, conn := range conns {
+		if c.cfg.LogEntries {
+			c.log.WithFields(map[string]any{
+				"src":      conn.Src.String(),
+				"dst":      conn.Dst.String(),
+				"tx_bytes": conn.TxBytes,
+				"rx_bytes": conn.RxBytes,
+				"proto":    conn.Proto,
+			}).Debug("ct")
+		}
+
 		if c.cfg.GroupPublicIPs && !conn.Dst.IP().IsPrivate() {
 			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
 		}
@@ -250,13 +261,13 @@ func (c *Collector) collect() error {
 		} else {
 			c.podMetrics[groupKey] = &rawNetworkMetric{
 				RawNetworkMetric: &pb.RawNetworkMetric{
-					SrcIp:      dns.ToIPint32(conn.Src.IP()),
-					DstIp:      dns.ToIPint32(conn.Dst.IP()),
-					TxBytes:    int64(conn.TxBytes),
-					TxPackets:  int64(conn.TxPackets),
-					RxBytes:    int64(conn.RxBytes),
-					RxPackets:  int64(conn.RxPackets),
-					Proto:      int32(conn.Proto),
+					SrcIp:     dns.ToIPint32(conn.Src.IP()),
+					DstIp:     dns.ToIPint32(conn.Dst.IP()),
+					TxBytes:   int64(conn.TxBytes),
+					TxPackets: int64(conn.TxPackets),
+					RxBytes:   int64(conn.RxBytes),
+					RxPackets: int64(conn.RxPackets),
+					Proto:     int32(conn.Proto),
 				},
 				lifetime: conn.Lifetime,
 			}

@@ -30,7 +30,7 @@ func TestHTTPSink(t *testing.T) {
 		reqBytes, err := io.ReadAll(req.Body)
 		reqBytesCh <- reqBytes
 		reqHeaders <- req.Header
-		r.NoError(err)
+		r.NoError(err) //nolint:testifylint
 	}))
 	defer srv.Close()
 
