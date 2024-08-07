@@ -24,7 +24,8 @@ func NewPodsByNodeCache(informer cache.SharedIndexInformer) *PodsByNodeCache {
 	if err := informer.SetTransform(defaultTransformFunc); err != nil {
 		panic(err)
 	}
-	if err := informer.AddIndexers(map[string]cache.IndexFunc{
+
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
 		podNodeIdx: func(obj interface{}) ([]string, error) {
 			switch t := obj.(type) {
 			case *corev1.Pod:
@@ -35,18 +36,34 @@ func NewPodsByNodeCache(informer cache.SharedIndexInformer) *PodsByNodeCache {
 			}
 			return nil, fmt.Errorf("expected pod, got unknown type %T", obj)
 		},
-	}); err != nil {
+	})
+
+	c := &PodsByNodeCache{informer: informer, indexer: indexer}
+	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: func(obj interface{}) {
+			c.onDelete(obj)
+		},
+		AddFunc: func(obj interface{}) {
+			c.onAddOrUpdate(obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			c.onAddOrUpdate(newObj)
+		},
+	})
+	if err != nil {
 		panic(err)
 	}
-	return &PodsByNodeCache{informer: informer}
+
+	return &PodsByNodeCache{informer: informer, indexer: indexer}
 }
 
 type PodsByNodeCache struct {
 	informer cache.SharedIndexInformer
+	indexer  cache.Indexer
 }
 
 func (p *PodsByNodeCache) Get(nodeName string) ([]*corev1.Pod, error) {
-	pods, err := p.informer.GetIndexer().ByIndex(podNodeIdx, nodeName)
+	pods, err := p.indexer.ByIndex(podNodeIdx, nodeName)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +72,23 @@ func (p *PodsByNodeCache) Get(nodeName string) ([]*corev1.Pod, error) {
 		res[i] = pod.(*corev1.Pod)
 	}
 	return res, nil
+}
+
+func (p *PodsByNodeCache) onDelete(obj interface{}) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
+	}
+	_ = p.indexer.Delete(pod)
+}
+
+func (p *PodsByNodeCache) onAddOrUpdate(obj interface{}) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
+	}
+
+	_ = p.indexer.Add(pod)
 }
 
 func NewNodeByNameCache(informer cache.SharedIndexInformer) *NodeByNameCache {
