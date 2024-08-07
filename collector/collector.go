@@ -110,6 +110,8 @@ type Collector struct {
 	currentTimeGetter func() time.Time
 	exporterClient    *http.Client
 	mu                sync.Mutex
+
+	firstCollectDone bool
 }
 
 func (c *Collector) Start(ctx context.Context) error {
@@ -249,6 +251,11 @@ func (c *Collector) collect() error {
 		}
 		c.entriesCache[connKey] = conn
 
+		// In delta mode we need to have initial conntrack connections so next collect can calculate only new deltas.
+		if c.cfg.SendTrafficDelta && !c.firstCollectDone {
+			continue
+		}
+
 		groupKey := entryGroupKey(conn)
 		if pm, found := c.podMetrics[groupKey]; found {
 			pm.TxBytes += int64(txBytes)
@@ -263,15 +270,19 @@ func (c *Collector) collect() error {
 				RawNetworkMetric: &pb.RawNetworkMetric{
 					SrcIp:     dns.ToIPint32(conn.Src.IP()),
 					DstIp:     dns.ToIPint32(conn.Dst.IP()),
-					TxBytes:   int64(conn.TxBytes),
-					TxPackets: int64(conn.TxPackets),
-					RxBytes:   int64(conn.RxBytes),
-					RxPackets: int64(conn.RxPackets),
+					TxBytes:   int64(txBytes),
+					TxPackets: int64(txPackets),
+					RxBytes:   int64(rxBytes),
+					RxPackets: int64(rxPackets),
 					Proto:     int32(conn.Proto),
 				},
 				lifetime: conn.Lifetime,
 			}
 		}
+	}
+
+	if !c.firstCollectDone {
+		c.firstCollectDone = true
 	}
 
 	c.log.Debugf("collection done in %s, pods=%d, conntrack=%d, conntrack_cache=%d", time.Since(start), len(pods), len(conns), len(c.entriesCache))

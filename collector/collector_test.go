@@ -492,21 +492,42 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		coll := newCollector(connTracker, ip2dns)
 		coll.cfg.SendTrafficDelta = true
 
-		// Collect first time.
+		// Initial collect. Should not have any metrics.
+		r.NoError(coll.collect())
+		r.Empty(coll.podMetrics)
+
+		// Second collect should add deltas.
+		newEntries := []conntrack.Entry{
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40001"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.5:3000"),
+				TxBytes:   40,
+				TxPackets: 6,
+				Proto:     6,
+			},
+			{
+				Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+				Dst:       netaddr.MustParseIPPort("10.14.7.4:3001"),
+				RxBytes:   20,
+				RxPackets: 4,
+				Proto:     6,
+			},
+		}
+		connTracker.entries = newEntries
 		r.NoError(coll.collect())
 
-		key1 := entryGroupKey(&initialEntries[0])
+		key1 := entryGroupKey(&newEntries[0])
 		r.EqualValues(20, coll.podMetrics[key1].TxBytes)
 		r.EqualValues(3, coll.podMetrics[key1].TxPackets)
 
-		key2 := entryGroupKey(&initialEntries[1])
+		key2 := entryGroupKey(&newEntries[1])
 		r.EqualValues(10, coll.podMetrics[key2].RxBytes)
 		r.EqualValues(2, coll.podMetrics[key2].RxPackets)
 
-		initialEntries[0].TxBytes += 10
-		initialEntries[0].TxPackets += 2
-		initialEntries[1].RxBytes += 5
-		initialEntries[1].RxPackets += 1
+		newEntries[0].TxBytes += 10
+		newEntries[0].TxPackets += 2
+		newEntries[1].RxBytes += 5
+		newEntries[1].RxPackets += 1
 		r.NoError(coll.collect())
 
 		// Check values are growing
@@ -547,10 +568,10 @@ func TestCollector__GetRawNetworkMetricsHandler(t *testing.T) {
 		r.EqualValues(15, batch.Items[1].RxBytes)
 		r.EqualValues(3, batch.Items[1].RxPackets)
 
-		initialEntries[0].TxBytes += 10
-		initialEntries[0].TxPackets += 2
-		initialEntries[1].RxBytes += 5
-		initialEntries[1].RxPackets += 1
+		newEntries[0].TxBytes += 10
+		newEntries[0].TxPackets += 2
+		newEntries[1].RxBytes += 5
+		newEntries[1].RxPackets += 1
 		r.NoError(coll.collect())
 
 		// Check values are reset
