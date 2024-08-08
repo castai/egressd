@@ -52,7 +52,7 @@ type Config struct {
 }
 
 type podsWatcher interface {
-	Get(nodeName string) ([]*corev1.Pod, error)
+	Get() ([]*corev1.Pod, error)
 }
 
 type rawNetworkMetric struct {
@@ -222,16 +222,6 @@ func (c *Collector) collect() error {
 	defer c.mu.Unlock()
 
 	for _, conn := range conns {
-		if c.cfg.LogEntries {
-			c.log.WithFields(map[string]any{
-				"src":      conn.Src.String(),
-				"dst":      conn.Dst.String(),
-				"tx_bytes": conn.TxBytes,
-				"rx_bytes": conn.RxBytes,
-				"proto":    conn.Proto,
-			}).Debug("ct")
-		}
-
 		if c.cfg.GroupPublicIPs && !conn.Dst.IP().IsPrivate() {
 			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
 		}
@@ -250,6 +240,18 @@ func (c *Collector) collect() error {
 			rxPackets = lo.Ternary(rxPackets < cachedConn.RxPackets, 0, rxPackets-cachedConn.RxPackets)
 		}
 		c.entriesCache[connKey] = conn
+
+		if c.cfg.LogEntries {
+			c.log.WithFields(map[string]any{
+				"src_ip":   conn.Src.IP().String(),
+				"src_port": conn.Src.Port(),
+				"dst_ip":   conn.Dst.IP().String(),
+				"dst_port": conn.Dst.Port(),
+				"tx_bytes": txBytes,
+				"rx_bytes": rxBytes,
+				"proto":    conn.Proto,
+			}).Debug("ct")
+		}
 
 		// In delta mode we need to have initial conntrack connections so next collect can calculate only new deltas.
 		if c.cfg.SendTrafficDelta && !c.firstCollectDone {
@@ -316,7 +318,7 @@ func (c *Collector) cleanup() {
 }
 
 func (c *Collector) getNodePods() ([]*corev1.Pod, error) {
-	pods, err := c.podsWatcher.Get(c.cfg.NodeName)
+	pods, err := c.podsWatcher.Get()
 	if err != nil {
 		return nil, err
 	}

@@ -677,14 +677,8 @@ type mockKubeWatcher struct {
 	pods []*corev1.Pod
 }
 
-func (m *mockKubeWatcher) Get(nodeName string) ([]*corev1.Pod, error) {
-	var res []*corev1.Pod
-	for _, pod := range m.pods {
-		if pod.Spec.NodeName == nodeName {
-			res = append(res, pod)
-		}
-	}
-	return res, nil
+func (m *mockKubeWatcher) Get() ([]*corev1.Pod, error) {
+	return m.pods, nil
 }
 
 type mockIP2DNS map[int32]string

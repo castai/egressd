@@ -2,6 +2,7 @@ package kube
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -100,57 +101,88 @@ func TestWatcher(t *testing.T) {
 	informersFactory := informers.NewSharedInformerFactoryWithOptions(clientset, 30*time.Second)
 	podsInformer := informersFactory.Core().V1().Pods().Informer()
 	nodesInformer := informersFactory.Core().V1().Nodes().Informer()
-	podsByNodeCache := NewPodsByNodeCache(podsInformer)
+	runningPods := NewRunningPodsCache(podsInformer)
 	podByIPCache := NewPodByIPCache(context.Background(), podsInformer, logrus.New())
 	nodeByNameCache := NewNodeByNameCache(nodesInformer)
 	nodeByIPCache := NewNodeByIPCache(nodesInformer)
 	informersFactory.Start(wait.NeverStop)
 	informersFactory.WaitForCacheSync(wait.NeverStop)
 
-	t.Run("get node by ip", func(t *testing.T) {
-		r := require.New(t)
-		n, err := nodeByIPCache.Get(n1.Status.Addresses[0].Address)
-		r.NoError(err)
-		r.Equal(n1, n)
+	t.Run("pods by ip", func(t *testing.T) {
+		t.Run("get pod by ip: when there are two pods with the same IP, prefers newest running", func(t *testing.T) {
+			r := require.New(t)
+			p, err := podByIPCache.Get(p1.Status.PodIP)
+			r.NoError(err)
+			r.Equal(p1, p)
+		})
+
+		t.Run("get recently stopped pod by ip", func(t *testing.T) {
+			r := require.New(t)
+			p, err := podByIPCache.Get(p3.Status.PodIP)
+			r.NoError(err)
+			r.Equal(p3, p)
+		})
+
+		t.Run("nonexistent pod by IP", func(t *testing.T) {
+			r := require.New(t)
+			_, err := podByIPCache.Get("nonexistentip")
+			r.ErrorIs(err, ErrNotFound)
+		})
+
+		t.Run("return no object for unknown pod ip", func(t *testing.T) {
+			r := require.New(t)
+			_, err := podByIPCache.Get("1.1.1.1")
+			r.EqualError(err, ErrNotFound.Error())
+		})
 	})
 
-	t.Run("get pod by ip: when there are two pods with the same IP, prefers newest running", func(t *testing.T) {
-		r := require.New(t)
-		p, err := podByIPCache.Get(p1.Status.PodIP)
-		r.NoError(err)
-		r.Equal(p1, p)
+	t.Run("nodes by ip", func(t *testing.T) {
+		t.Run("get node by ip", func(t *testing.T) {
+			r := require.New(t)
+			n, err := nodeByIPCache.Get(n1.Status.Addresses[0].Address)
+			r.NoError(err)
+			r.Equal(n1, n)
+		})
 	})
 
-	t.Run("get recently stopped pod by ip", func(t *testing.T) {
-		r := require.New(t)
-		p, err := podByIPCache.Get(p3.Status.PodIP)
-		r.NoError(err)
-		r.Equal(p3, p)
+	t.Run("pods by node", func(t *testing.T) {
+		t.Run("get running pods by node name", func(t *testing.T) {
+			r := require.New(t)
+			pods, err := runningPods.Get()
+			r.NoError(err)
+			r.Equal(p1, pods[0])
+		})
+
+		t.Run("delete pod", func(t *testing.T) {
+			r := require.New(t)
+			r.NoError(clientset.CoreV1().Pods(p1.Namespace).Delete(context.TODO(), p1.Name, metav1.DeleteOptions{}))
+
+			r.Eventually(func() bool {
+				pods, err := runningPods.Get()
+				r.NoError(err)
+				return len(pods) == 0
+			}, time.Second, time.Millisecond)
+
+		})
 	})
 
-	t.Run("nonexistent pod by IP", func(t *testing.T) {
-		r := require.New(t)
-		_, err := podByIPCache.Get("nonexistentip")
-		r.ErrorIs(err, ErrNotFound)
+	t.Run("nodes by node", func(t *testing.T) {
+		t.Run("get node by node name", func(t *testing.T) {
+			r := require.New(t)
+			node, err := nodeByNameCache.Get(n1.Name)
+			r.NoError(err)
+			r.Equal(n1, node)
+		})
+
+		t.Run("delete node", func(t *testing.T) {
+			r := require.New(t)
+			r.NoError(clientset.CoreV1().Nodes().Delete(context.TODO(), n1.Name, metav1.DeleteOptions{}))
+
+			r.Eventually(func() bool {
+				_, err := nodeByNameCache.Get(n1.Name)
+				return errors.Is(err, ErrNotFound)
+			}, time.Second, time.Millisecond)
+		})
 	})
 
-	t.Run("get running pods by node name", func(t *testing.T) {
-		r := require.New(t)
-		pods, err := podsByNodeCache.Get(n1.Name)
-		r.NoError(err)
-		r.Equal(p1, pods[0])
-	})
-
-	t.Run("get node by node name", func(t *testing.T) {
-		r := require.New(t)
-		node, err := nodeByNameCache.Get(n1.Name)
-		r.NoError(err)
-		r.Equal(n1, node)
-	})
-
-	t.Run("return no object for unknown pod ip", func(t *testing.T) {
-		r := require.New(t)
-		_, err := podByIPCache.Get("1.1.1.1")
-		r.EqualError(err, ErrNotFound.Error())
-	})
 }

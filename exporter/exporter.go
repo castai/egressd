@@ -328,7 +328,6 @@ func getCollectorPodMetricsServerURL(pod corev1.Pod) string {
 }
 
 type kubeWatcher interface {
-	GetPodsByNode(nodeName string) ([]*corev1.Pod, error)
 	GetPodByIP(ip string) (*corev1.Pod, error)
 	GetNodeByName(name string) (*corev1.Node, error)
 	GetNodeByIP(ip string) (*corev1.Node, error)

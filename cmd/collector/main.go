@@ -108,7 +108,7 @@ func run(log logrus.FieldLogger) error {
 		options.FieldSelector = "spec.nodeName=" + os.Getenv("NODE_NAME")
 	}))
 	podsInformer := informersFactory.Core().V1().Pods().Informer()
-	podsByNodeCache := kube.NewPodsByNodeCache(podsInformer)
+	podsByNodeCache := kube.NewRunningPodsCache(podsInformer)
 	informersFactory.Start(wait.NeverStop)
 	informersFactory.WaitForCacheSync(wait.NeverStop)
 
