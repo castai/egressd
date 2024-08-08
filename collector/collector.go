@@ -241,7 +241,7 @@ func (c *Collector) collect() error {
 		}
 		c.entriesCache[connKey] = conn
 
-		if c.cfg.LogEntries {
+		if c.cfg.LogEntries && (rxBytes > 0 || txBytes > 0) {
 			c.log.WithFields(map[string]any{
 				"src_ip":   conn.Src.IP().String(),
 				"src_port": conn.Src.Port(),
