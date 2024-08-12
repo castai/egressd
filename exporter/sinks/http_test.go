@@ -30,7 +30,7 @@ func TestHTTPSink(t *testing.T) {
 		reqBytes, err := io.ReadAll(req.Body)
 		reqBytesCh <- reqBytes
 		reqHeaders <- req.Header
-		r.NoError(err)
+		r.NoError(err) //nolint:testifylint
 	}))
 	defer srv.Close()
 
@@ -43,6 +43,7 @@ func TestHTTPSink(t *testing.T) {
 			"Custom-Header": "1",
 		},
 		Timeout: 10 * time.Second,
+		Trace:   true,
 	}
 	sink := NewHTTPSink(log, "http-test", cfg, "0.0.0")
 	expectedBatch := &pb.PodNetworkMetricBatch{

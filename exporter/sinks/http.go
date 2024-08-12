@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -90,11 +93,36 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	reqID := uuid.NewString()
+
+	if s.cfg.Trace {
+		trace := &httptrace.ClientTrace{
+			GotConn: func(connInfo httptrace.GotConnInfo) {
+				fmt.Printf("http_sink_trace ts=%s req_id=%s method=GotConn: %+v remote=%s\n", time.Now().UTC().Format(time.RFC3339Nano), reqID, connInfo, connInfo.Conn.RemoteAddr().String())
+			},
+			DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
+				fmt.Printf("http_sink_trace ts=%s req_id=%s method=DNSDone: %+v\n", time.Now().UTC().Format(time.RFC3339Nano), reqID, dnsInfo)
+			},
+			DNSStart: func(dnsInfo httptrace.DNSStartInfo) {
+				fmt.Printf("http_sink_trace ts=%s req_id=%s method=DNSStart: %+v\n", time.Now().UTC().Format(time.RFC3339Nano), reqID, dnsInfo)
+			},
+			TLSHandshakeStart: func() {
+				fmt.Printf("http_sink_trace ts=%s req_id=%s method=TLSHandshakeStart\n", time.Now().UTC().Format(time.RFC3339Nano), reqID)
+			},
+			TLSHandshakeDone: func(state tls.ConnectionState, err error) {
+				fmt.Printf("http_sink_trace ts=%s req_id=%s method=TLSHandshakeDone err=%v\n", time.Now().UTC().Format(time.RFC3339Nano), reqID, err)
+			},
+		}
+		ctx = httptrace.WithClientTrace(ctx, trace)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, s.cfg.Method, uri.String(), payloadBuf)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header = header
+	req.Header.Add("X-Request-ID", reqID)
 
 	s.log.Infof("pushing metrics, items=%d, size_bytes=%d", len(batch.Items), payloadBuf.Len())
 

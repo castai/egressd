@@ -47,6 +47,7 @@ type SinkHTTPConfig struct {
 	Encoding    Encoding          `yaml:"encoding"`
 	Headers     map[string]string `yaml:"headers"`
 	Timeout     time.Duration     `yaml:"timeout"`
+	Trace       bool              `yaml:"trace"`
 }
 
 type SinkPromRemoteWriteConfig struct {
