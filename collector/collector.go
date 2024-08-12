@@ -222,7 +222,7 @@ func (c *Collector) collect() error {
 	defer c.mu.Unlock()
 
 	for _, conn := range conns {
-		if c.cfg.GroupPublicIPs && !conn.Dst.IP().IsPrivate() {
+		if c.cfg.GroupPublicIPs && !isPrivateNetwork(conn.Dst.IP()) {
 			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
 		}
 		connKey := conntrackEntryKey(conn)
@@ -382,4 +382,13 @@ func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 
 	conntrackEntryHash.Reset()
 	return res
+}
+
+func isPrivateNetwork(ip netaddr.IP) bool {
+	return ip.IsPrivate() ||
+		ip.IsLoopback() ||
+		ip.IsMulticast() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast()
 }
