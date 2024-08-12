@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,39 +101,10 @@ func TestWatcher(t *testing.T) {
 	podsInformer := informersFactory.Core().V1().Pods().Informer()
 	nodesInformer := informersFactory.Core().V1().Nodes().Informer()
 	runningPods := NewRunningPodsCache(podsInformer)
-	podByIPCache := NewPodByIPCache(context.Background(), podsInformer, logrus.New())
 	nodeByNameCache := NewNodeByNameCache(nodesInformer)
 	nodeByIPCache := NewNodeByIPCache(nodesInformer)
 	informersFactory.Start(wait.NeverStop)
 	informersFactory.WaitForCacheSync(wait.NeverStop)
-
-	t.Run("pods by ip", func(t *testing.T) {
-		t.Run("get pod by ip: when there are two pods with the same IP, prefers newest running", func(t *testing.T) {
-			r := require.New(t)
-			p, err := podByIPCache.Get(p1.Status.PodIP)
-			r.NoError(err)
-			r.Equal(p1, p)
-		})
-
-		t.Run("get recently stopped pod by ip", func(t *testing.T) {
-			r := require.New(t)
-			p, err := podByIPCache.Get(p3.Status.PodIP)
-			r.NoError(err)
-			r.Equal(p3, p)
-		})
-
-		t.Run("nonexistent pod by IP", func(t *testing.T) {
-			r := require.New(t)
-			_, err := podByIPCache.Get("nonexistentip")
-			r.ErrorIs(err, ErrNotFound)
-		})
-
-		t.Run("return no object for unknown pod ip", func(t *testing.T) {
-			r := require.New(t)
-			_, err := podByIPCache.Get("1.1.1.1")
-			r.EqualError(err, ErrNotFound.Error())
-		})
-	})
 
 	t.Run("nodes by ip", func(t *testing.T) {
 		t.Run("get node by ip", func(t *testing.T) {
