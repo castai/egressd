@@ -124,11 +124,11 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 	req.Header = header
 	req.Header.Add("X-Request-ID", reqID)
 
-	s.log.Infof("pushing metrics, items=%d, size_bytes=%d", len(batch.Items), payloadBuf.Len())
+	s.log.Infof("pushing metrics, req_id=%s, items=%d, size_bytes=%d", reqID, len(batch.Items), payloadBuf.Len())
 
 	var resp *http.Response
 	backoff := wait.Backoff{
-		Duration: 10 * time.Millisecond,
+		Duration: 100 * time.Millisecond,
 		Factor:   1.5,
 		Jitter:   0.2,
 		Steps:    3,
@@ -136,8 +136,8 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 	err = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (done bool, err error) {
 		resp, err = s.httpClient.Do(req) //nolint:bodyclose
 		if err != nil {
-			s.log.Warnf("failed sending request: %v", err)
-			return false, fmt.Errorf("sending request %w", err)
+			s.log.Warnf("failed sending request, req_id=%s, %v", reqID, err)
+			return false, fmt.Errorf("sending request, req_id=%s:%w", reqID, err)
 		}
 		return true, nil
 	})
@@ -155,7 +155,7 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 		if _, err := buf.ReadFrom(resp.Body); err != nil {
 			s.log.Errorf("failed reading error response body: %v", err)
 		}
-		return fmt.Errorf("request error status_code=%d body=%s url=%s", resp.StatusCode, buf.String(), uri.String())
+		return fmt.Errorf("request error req_id=%s status_code=%d body=%s url=%s", reqID, resp.StatusCode, buf.String(), uri.String())
 	}
 
 	return nil
