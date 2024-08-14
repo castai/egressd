@@ -222,9 +222,6 @@ func (c *Collector) collect() error {
 	defer c.mu.Unlock()
 
 	for _, conn := range conns {
-		if c.cfg.GroupPublicIPs && !isPrivateNetwork(conn.Dst.IP()) {
-			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
-		}
 		connKey := conntrackEntryKey(conn)
 		txBytes := conn.TxBytes
 		txPackets := conn.TxPackets
@@ -256,6 +253,10 @@ func (c *Collector) collect() error {
 		// In delta mode we need to have initial conntrack connections so next collect can calculate only new deltas.
 		if c.cfg.SendTrafficDelta && !c.firstCollectDone {
 			continue
+		}
+
+		if c.cfg.GroupPublicIPs && !isPrivateNetwork(conn.Dst.IP()) {
+			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
 		}
 
 		groupKey := entryGroupKey(conn)

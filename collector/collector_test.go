@@ -194,8 +194,6 @@ func TestCollector(t *testing.T) {
 	})
 
 	t.Run("group public ips", func(t *testing.T) {
-		r := require.New(t)
-
 		// Initially conntrack entries.
 		connEntries := []conntrack.Entry{
 			{
@@ -228,35 +226,130 @@ func TestCollector(t *testing.T) {
 		coll := newCollector(connTracker)
 		coll.cfg.GroupPublicIPs = true
 
-		// Collect first time.
-		r.NoError(coll.collect())
+		t.Run("initial collect", func(t *testing.T) {
+			r := require.New(t)
 
-		items := lo.Map(lo.Values(coll.podMetrics), func(item *rawNetworkMetric, index int) *pb.RawNetworkMetric {
-			return item.RawNetworkMetric
-		})
-		sort.Slice(items, func(i, j int) bool {
-			return items[i].Proto < items[j].Proto
-		})
-		r.Len(items, 2)
+			// Collect first time.
+			r.NoError(coll.collect())
 
-		r.Contains(items, &pb.RawNetworkMetric{
-			SrcIp:     168691468,
-			DstIp:     0,
-			TxBytes:   25,
-			TxPackets: 2,
-			RxBytes:   0,
-			RxPackets: 0,
-			Proto:     6,
+			items := lo.Map(lo.Values(coll.podMetrics), func(item *rawNetworkMetric, index int) *pb.RawNetworkMetric {
+				return item.RawNetworkMetric
+			})
+			sort.Slice(items, func(i, j int) bool {
+				return items[i].DstIp < items[j].DstIp
+			})
+			r.Len(items, 2)
+			// Metric to public grouped ip.
+			r.Equal(&pb.RawNetworkMetric{
+				SrcIp:     168691468,
+				DstIp:     0,
+				TxBytes:   25,
+				TxPackets: 2,
+				RxBytes:   0,
+				RxPackets: 0,
+				Proto:     6,
+			}, items[0])
+
+			// Metric to not grouped private ip.
+			r.Equal(&pb.RawNetworkMetric{
+				SrcIp:     168691468,
+				DstIp:     168691461,
+				TxBytes:   15,
+				TxPackets: 1,
+				RxBytes:   0,
+				RxPackets: 0,
+				Proto:     6,
+			}, items[1])
 		})
 
-		r.Contains(items, &pb.RawNetworkMetric{
-			SrcIp:     168691468,
-			DstIp:     168691461,
-			TxBytes:   15,
-			TxPackets: 1,
-			RxBytes:   0,
-			RxPackets: 0,
-			Proto:     6,
+		t.Run("new conntrack record should increase public ips traffic", func(t *testing.T) {
+			r := require.New(t)
+
+			connEntries = []conntrack.Entry{
+				{
+					Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+					Dst:       netaddr.MustParseIPPort("9.9.9.9:3000"),
+					TxBytes:   5,
+					TxPackets: 1,
+					Proto:     6,
+				},
+			}
+			connTracker.entries = connEntries
+
+			r.NoError(coll.collect())
+			items := lo.Map(lo.Values(coll.podMetrics), func(item *rawNetworkMetric, index int) *pb.RawNetworkMetric {
+				return item.RawNetworkMetric
+			})
+			sort.Slice(items, func(i, j int) bool {
+				return items[i].DstIp < items[j].DstIp
+			})
+			r.Len(items, 2)
+			// Metric to public grouped ip.
+			r.Equal(&pb.RawNetworkMetric{
+				SrcIp:     168691468,
+				DstIp:     0,
+				TxBytes:   30, // Should increase this metric.
+				TxPackets: 3,
+				RxBytes:   0,
+				RxPackets: 0,
+				Proto:     6,
+			}, items[0])
+
+			// Metric to not grouped private ip.
+			r.Equal(&pb.RawNetworkMetric{
+				SrcIp:     168691468,
+				DstIp:     168691461,
+				TxBytes:   15,
+				TxPackets: 1,
+				RxBytes:   0,
+				RxPackets: 0,
+				Proto:     6,
+			}, items[1])
+		})
+
+		t.Run("time wait old conntrack record should be skipped", func(t *testing.T) {
+			r := require.New(t)
+
+			connEntries = []conntrack.Entry{
+				{
+					Src:       netaddr.MustParseIPPort("10.14.7.12:40002"),
+					Dst:       netaddr.MustParseIPPort("9.9.9.9:3000"),
+					TxBytes:   5,
+					TxPackets: 1,
+					Proto:     6,
+				},
+			}
+			connTracker.entries = connEntries
+
+			r.NoError(coll.collect())
+			items := lo.Map(lo.Values(coll.podMetrics), func(item *rawNetworkMetric, index int) *pb.RawNetworkMetric {
+				return item.RawNetworkMetric
+			})
+			sort.Slice(items, func(i, j int) bool {
+				return items[i].DstIp < items[j].DstIp
+			})
+			r.Len(items, 2)
+			// Metric to public grouped ip.
+			r.Equal(&pb.RawNetworkMetric{
+				SrcIp:     168691468,
+				DstIp:     0,
+				TxBytes:   30,
+				TxPackets: 3,
+				RxBytes:   0,
+				RxPackets: 0,
+				Proto:     6,
+			}, items[0])
+
+			// Metric to not grouped private ip.
+			r.Equal(&pb.RawNetworkMetric{
+				SrcIp:     168691468,
+				DstIp:     168691461,
+				TxBytes:   15,
+				TxPackets: 1,
+				RxBytes:   0,
+				RxPackets: 0,
+				Proto:     6,
+			}, items[1])
 		})
 	})
 
