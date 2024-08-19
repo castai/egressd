@@ -35,6 +35,8 @@ sinks:
       url: http://prometheus:8428/api/v1/write
       headers:
         X-Scope-OrgID: org-id
+      labels:
+        label-key: label-value
 `)
 		cfgFilePath := filepath.Join(t.TempDir(), "config.yaml")
 		r.NoError(os.WriteFile(cfgFilePath, expectedConfigBytes, 0600))
@@ -85,6 +87,9 @@ func newTestConfig() Config {
 					URL: "http://prometheus:8428/api/v1/write",
 					Headers: map[string]string{
 						"X-Scope-OrgID": "org-id",
+					},
+					Labels: map[string]string{
+						"label-key": "label-value",
 					},
 				},
 			},

@@ -2,6 +2,7 @@ package sinks
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,6 +24,9 @@ func TestPromSink(t *testing.T) {
 		URL: "prom-remote-write-url",
 		Headers: map[string]string{
 			"Custom-Header": "1",
+		},
+		Labels: map[string]string{
+			"xz_label_key": "xz_label_value",
 		},
 	}
 	client := &mockPromWriteClient{}
@@ -58,23 +62,30 @@ func TestPromSink(t *testing.T) {
 	}
 	r.NoError(sink.Push(ctx, batch))
 
+	for _, l := range client.req.TimeSeries {
+		for _, ll := range l.Labels {
+			fmt.Println(ll.Name)
+		}
+	}
+
 	r.Equal([]promwrite.TimeSeries{
 		{
 			Labels: []promwrite.Label{
 				{Name: "__name__", Value: "egressd_transmit_bytes_total"},
-				{Name: "src_pod", Value: "p1"},
-				{Name: "src_node", Value: "n1"},
-				{Name: "src_namespace", Value: "team1"},
-				{Name: "src_zone", Value: "us-east-1a"},
-				{Name: "src_ip", Value: "10.14.7.12"},
-				{Name: "dst_pod", Value: "p2"},
-				{Name: "dst_node", Value: "n1"},
-				{Name: "dst_namespace", Value: "team2"},
-				{Name: "dst_zone", Value: "us-east-1a"},
+				{Name: "cross_zone", Value: "false"},
 				{Name: "dst_ip", Value: "10.14.7.5"},
 				{Name: "dst_ip_type", Value: "private"},
-				{Name: "cross_zone", Value: "false"},
+				{Name: "dst_namespace", Value: "team2"},
+				{Name: "dst_node", Value: "n1"},
+				{Name: "dst_pod", Value: "p2"},
+				{Name: "dst_zone", Value: "us-east-1a"},
 				{Name: "proto", Value: "TCP"},
+				{Name: "src_ip", Value: "10.14.7.12"},
+				{Name: "src_namespace", Value: "team1"},
+				{Name: "src_node", Value: "n1"},
+				{Name: "src_pod", Value: "p1"},
+				{Name: "src_zone", Value: "us-east-1a"},
+				{Name: "xz_label_key", Value: "xz_label_value"},
 			},
 			Sample: promwrite.Sample{Time: ts, Value: 35},
 		},
