@@ -48,10 +48,11 @@ type Config struct {
 	// SendTrafficDelta used to determines if traffic should be sent as delta of 2 consecutive conntrack entries
 	// or as the constantly growing counter value
 	SendTrafficDelta bool
+	LogEntries       bool
 }
 
 type podsWatcher interface {
-	Get(nodeName string) ([]*corev1.Pod, error)
+	Get() ([]*corev1.Pod, error)
 }
 
 type rawNetworkMetric struct {
@@ -109,6 +110,8 @@ type Collector struct {
 	currentTimeGetter func() time.Time
 	exporterClient    *http.Client
 	mu                sync.Mutex
+
+	firstCollectDone bool
 }
 
 func (c *Collector) Start(ctx context.Context) error {
@@ -219,9 +222,6 @@ func (c *Collector) collect() error {
 	defer c.mu.Unlock()
 
 	for _, conn := range conns {
-		if c.cfg.GroupPublicIPs && !conn.Dst.IP().IsPrivate() {
-			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
-		}
 		connKey := conntrackEntryKey(conn)
 		txBytes := conn.TxBytes
 		txPackets := conn.TxPackets
@@ -238,6 +238,27 @@ func (c *Collector) collect() error {
 		}
 		c.entriesCache[connKey] = conn
 
+		if c.cfg.LogEntries && (rxBytes > 0 || txBytes > 0) {
+			c.log.WithFields(map[string]any{
+				"src_ip":   conn.Src.IP().String(),
+				"src_port": conn.Src.Port(),
+				"dst_ip":   conn.Dst.IP().String(),
+				"dst_port": conn.Dst.Port(),
+				"tx_bytes": txBytes,
+				"rx_bytes": rxBytes,
+				"proto":    conn.Proto,
+			}).Debug("ct")
+		}
+
+		// In delta mode we need to have initial conntrack connections so next collect can calculate only new deltas.
+		if c.cfg.SendTrafficDelta && !c.firstCollectDone {
+			continue
+		}
+
+		if c.cfg.GroupPublicIPs && !isPrivateNetwork(conn.Dst.IP()) {
+			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
+		}
+
 		groupKey := entryGroupKey(conn)
 		if pm, found := c.podMetrics[groupKey]; found {
 			pm.TxBytes += int64(txBytes)
@@ -250,17 +271,21 @@ func (c *Collector) collect() error {
 		} else {
 			c.podMetrics[groupKey] = &rawNetworkMetric{
 				RawNetworkMetric: &pb.RawNetworkMetric{
-					SrcIp:      dns.ToIPint32(conn.Src.IP()),
-					DstIp:      dns.ToIPint32(conn.Dst.IP()),
-					TxBytes:    int64(conn.TxBytes),
-					TxPackets:  int64(conn.TxPackets),
-					RxBytes:    int64(conn.RxBytes),
-					RxPackets:  int64(conn.RxPackets),
-					Proto:      int32(conn.Proto),
+					SrcIp:     dns.ToIPint32(conn.Src.IP()),
+					DstIp:     dns.ToIPint32(conn.Dst.IP()),
+					TxBytes:   int64(txBytes),
+					TxPackets: int64(txPackets),
+					RxBytes:   int64(rxBytes),
+					RxPackets: int64(rxPackets),
+					Proto:     int32(conn.Proto),
 				},
 				lifetime: conn.Lifetime,
 			}
 		}
+	}
+
+	if !c.firstCollectDone {
+		c.firstCollectDone = true
 	}
 
 	c.log.Debugf("collection done in %s, pods=%d, conntrack=%d, conntrack_cache=%d", time.Since(start), len(pods), len(conns), len(c.entriesCache))
@@ -294,7 +319,7 @@ func (c *Collector) cleanup() {
 }
 
 func (c *Collector) getNodePods() ([]*corev1.Pod, error) {
-	pods, err := c.podsWatcher.Get(c.cfg.NodeName)
+	pods, err := c.podsWatcher.Get()
 	if err != nil {
 		return nil, err
 	}
@@ -358,4 +383,13 @@ func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 
 	conntrackEntryHash.Reset()
 	return res
+}
+
+func isPrivateNetwork(ip netaddr.IP) bool {
+	return ip.IsPrivate() ||
+		ip.IsLoopback() ||
+		ip.IsMulticast() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast()
 }

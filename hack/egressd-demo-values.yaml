@@ -16,3 +16,5 @@ exporter:
           url: "http://egressd-victoria:8428/api/v1/write"
           headers:
             My-Optional-Header: my-header-value
+          labels:
+            my_custom_label: label_value 

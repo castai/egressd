@@ -3,14 +3,16 @@ package kube
 import (
 	"errors"
 	"fmt"
+	"sync"
 
+	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
 const (
 	podIPIdx    = "pods-by-ip"
-	podNodeIdx  = "pods-by-node"
 	nodeNameIDx = "nodes-by-name"
 	nodeIPIdx   = "nodes-by-ip"
 )
@@ -20,41 +22,69 @@ var (
 	ErrToManyObjects = errors.New("too many objects")
 )
 
-func NewPodsByNodeCache(informer cache.SharedIndexInformer) *PodsByNodeCache {
+func NewRunningPodsCache(informer cache.SharedIndexInformer) *RunningPodsCache {
 	if err := informer.SetTransform(defaultTransformFunc); err != nil {
 		panic(err)
 	}
-	if err := informer.AddIndexers(map[string]cache.IndexFunc{
-		podNodeIdx: func(obj interface{}) ([]string, error) {
-			switch t := obj.(type) {
-			case *corev1.Pod:
-				if t.Status.Phase == corev1.PodRunning {
-					return []string{t.Spec.NodeName}, nil
-				}
-				return []string{}, nil
-			}
-			return nil, fmt.Errorf("expected pod, got unknown type %T", obj)
+
+	c := &RunningPodsCache{
+		informer: informer,
+		pods:     map[types.UID]*corev1.Pod{},
+	}
+	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: func(obj interface{}) {
+			c.onDelete(obj)
 		},
-	}); err != nil {
+		AddFunc: func(obj interface{}) {
+			c.onAddOrUpdate(obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			c.onAddOrUpdate(newObj)
+		},
+	})
+	if err != nil {
 		panic(err)
 	}
-	return &PodsByNodeCache{informer: informer}
+
+	return c
 }
 
-type PodsByNodeCache struct {
+type RunningPodsCache struct {
 	informer cache.SharedIndexInformer
+
+	mu   sync.Mutex
+	pods map[types.UID]*corev1.Pod
 }
 
-func (p *PodsByNodeCache) Get(nodeName string) ([]*corev1.Pod, error) {
-	pods, err := p.informer.GetIndexer().ByIndex(podNodeIdx, nodeName)
-	if err != nil {
-		return nil, err
+func (p *RunningPodsCache) Get() ([]*corev1.Pod, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return lo.Values(p.pods), nil
+}
+
+func (p *RunningPodsCache) onDelete(obj interface{}) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
 	}
-	res := make([]*corev1.Pod, len(pods))
-	for i, pod := range pods {
-		res[i] = pod.(*corev1.Pod)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.pods, pod.GetUID())
+}
+
+func (p *RunningPodsCache) onAddOrUpdate(obj interface{}) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
 	}
-	return res, nil
+
+	if pod.Status.PodIP == "" || pod.Status.Phase != corev1.PodRunning {
+		return
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.pods[pod.GetUID()] = pod
 }
 
 func NewNodeByNameCache(informer cache.SharedIndexInformer) *NodeByNameCache {

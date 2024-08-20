@@ -42,6 +42,7 @@ var (
 	ciliumClockSource      = flag.String("cilium-clock-source", string(conntrack.ClockSourceJiffies), "Kernel clock source used in cilium (jiffies or ktime)")
 	groupPublicIPs         = flag.Bool("group-public-ips", false, "Group public ips destinations as 0.0.0.0")
 	sendTrafficDelta       = flag.Bool("send-traffic-delta", false, "Send traffic delta between reads of conntrack entry. Traffic counter is sent by default")
+	logEntries             = flag.Bool("log-entries", false, "Log raw conntrack entries")
 	ebpfDNSTracerEnabled   = flag.Bool("ebpf-dns-tracer-enabled", true, "Enable DNS tracer using eBPF")
 	ebpfDNSTracerQueueSize = flag.Int("ebpf-dns-tracer-queue-size", 1000, "Size of the queue for DNS tracer")
 	// Kubernetes requires container to run in privileged mode if Bidirectional mount is used.
@@ -107,7 +108,7 @@ func run(log logrus.FieldLogger) error {
 		options.FieldSelector = "spec.nodeName=" + os.Getenv("NODE_NAME")
 	}))
 	podsInformer := informersFactory.Core().V1().Pods().Informer()
-	podsByNodeCache := kube.NewPodsByNodeCache(podsInformer)
+	podsByNodeCache := kube.NewRunningPodsCache(podsInformer)
 	informersFactory.Start(wait.NeverStop)
 	informersFactory.WaitForCacheSync(wait.NeverStop)
 
@@ -139,6 +140,7 @@ func run(log logrus.FieldLogger) error {
 		ExcludeNamespaces: *excludeNamespaces,
 		GroupPublicIPs:    *groupPublicIPs,
 		SendTrafficDelta:  *sendTrafficDelta,
+		LogEntries:        *logEntries,
 	}
 	coll := collector.New(
 		cfg,

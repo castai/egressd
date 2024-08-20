@@ -32,9 +32,9 @@ func TestExporter(t *testing.T) {
 	ctx := context.Background()
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
-	pod1Ip := netaddr.IPv4(10,14,7,12)
-	pod2Ip := netaddr.IPv4(10,14,7,5)
-	publicIp := netaddr.IPv4(192,0,0,1)
+	pod1Ip := netaddr.IPv4(10, 14, 7, 12)
+	pod2Ip := netaddr.IPv4(10, 14, 7, 5)
+	publicIp := netaddr.IPv4(192, 0, 0, 1)
 
 	kubeWatcher := &mockKubeWatcher{
 		pods: []*corev1.Pod{
@@ -103,9 +103,9 @@ func TestExporter(t *testing.T) {
 			},
 		}
 		batchBytes, err := proto.Marshal(batch)
-		r.NoError(err)
+		r.NoError(err) //nolint:testifylint
 		_, err = w.Write(batchBytes)
-		r.NoError(err)
+		r.NoError(err) //nolint:testifylint
 	}))
 	defer collector1Srv.Close()
 

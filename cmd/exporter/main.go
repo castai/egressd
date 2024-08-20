@@ -100,15 +100,14 @@ func run(log logrus.FieldLogger) error {
 	informersFactory := informers.NewSharedInformerFactoryWithOptions(clientset, 30*time.Second)
 	podsInformer := informersFactory.Core().V1().Pods().Informer()
 	nodesInformer := informersFactory.Core().V1().Nodes().Informer()
-	podsByNodeCache := kube.NewPodsByNodeCache(podsInformer)
-	podByIPCache := kube.NewPodByIPCache(ctx, podsInformer, log)
+	podByIPCache := kube.NewPodByIPCache(podsInformer, log)
+	go podByIPCache.Run(ctx)
 	nodeByNameCache := kube.NewNodeByNameCache(nodesInformer)
 	nodeByIPCache := kube.NewNodeByIPCache(nodesInformer)
 	informersFactory.Start(wait.NeverStop)
 	informersFactory.WaitForCacheSync(wait.NeverStop)
 
 	kw := &kubeWatcher{
-		podsByNode: podsByNodeCache,
 		podByIP:    podByIPCache,
 		nodeByName: nodeByNameCache,
 		nodeByIP:   nodeByIPCache,
@@ -186,14 +185,9 @@ func healthHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 type kubeWatcher struct {
-	podsByNode *kube.PodsByNodeCache
 	podByIP    *kube.PodByIPCache
 	nodeByName *kube.NodeByNameCache
 	nodeByIP   *kube.NodeByIPCache
-}
-
-func (k *kubeWatcher) GetPodsByNode(nodeName string) ([]*v1.Pod, error) {
-	return k.podsByNode.Get(nodeName)
 }
 
 func (k *kubeWatcher) GetPodByIP(ip string) (*v1.Pod, error) {
