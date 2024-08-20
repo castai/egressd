@@ -3,8 +3,8 @@ package sinks
 import (
 	"context"
 	"slices"
-	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -57,21 +57,19 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 		// Initial labels, sorted by label name asc.
 		labels := []promwrite.Label{
 			{Name: "__name__", Value: "egressd_transmit_bytes_total"},
-			{Name: "src_pod", Value: m.SrcPod},
-			{Name: "src_node", Value: m.SrcNode},
-			{Name: "src_namespace", Value: m.SrcNamespace},
-			{Name: "src_zone", Value: m.SrcZone},
-			{Name: "src_ip", Value: m.SrcIp},
-
-			{Name: "dst_pod", Value: m.DstPod},
-			{Name: "dst_node", Value: m.DstNode},
-			{Name: "dst_namespace", Value: m.DstNamespace},
-			{Name: "dst_zone", Value: m.DstZone},
+			{Name: "cross_zone", Value: isCrossZoneValue(m)},
 			{Name: "dst_ip", Value: dstIP.String()},
 			{Name: "dst_ip_type", Value: dstIPType},
-			{Name: "cross_zone", Value: isCrossZoneValue(m)},
-
+			{Name: "dst_namespace", Value: m.DstNamespace},
+			{Name: "dst_node", Value: m.DstNode},
+			{Name: "dst_pod", Value: m.DstPod},
+			{Name: "dst_zone", Value: m.DstZone},
 			{Name: "proto", Value: protoString(uint8(m.Proto))},
+			{Name: "src_ip", Value: m.SrcIp},
+			{Name: "src_namespace", Value: m.SrcNamespace},
+			{Name: "src_node", Value: m.SrcNode},
+			{Name: "src_pod", Value: m.SrcPod},
+			{Name: "src_zone", Value: m.SrcZone},
 		}
 
 		if customLabelsCount := len(s.cfg.Labels); customLabelsCount > 0 {
@@ -80,8 +78,8 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 				labels = append(labels, promwrite.Label{Name: k, Value: v})
 			}
 			// Some prometheus like databases requires sorted labels. See https://github.com/castai/egressd/pull/109
-			sort.Slice(labels, func(i, j int) bool {
-				return labels[i].Name < labels[j].Name
+			slices.SortStableFunc(labels, func(a, b promwrite.Label) int {
+				return strings.Compare(a.Name, b.Name)
 			})
 		}
 
