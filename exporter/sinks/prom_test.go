@@ -155,8 +155,7 @@ func TestPromSink(t *testing.T) {
 				},
 				Sample: promwrite.Sample{Time: ts, Value: 30},
 			},
-		},
-			client.reqs[0].TimeSeries)
+		}, client.reqs[0].TimeSeries)
 
 		r.Equal([]promwrite.TimeSeries{
 			{
@@ -179,8 +178,7 @@ func TestPromSink(t *testing.T) {
 				},
 				Sample: promwrite.Sample{Time: ts, Value: 35},
 			},
-		},
-			client.reqs[1].TimeSeries)
+		}, client.reqs[1].TimeSeries)
 	})
 
 }
