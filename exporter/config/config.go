@@ -50,9 +50,10 @@ type SinkHTTPConfig struct {
 }
 
 type SinkPromRemoteWriteConfig struct {
-	URL     string            `yaml:"url"`
-	Headers map[string]string `yaml:"headers"`
-	Labels  map[string]string `yaml:"labels"`
+	URL                     string            `yaml:"url"`
+	Headers                 map[string]string `yaml:"headers"`
+	Labels                  map[string]string `yaml:"labels"`
+	SendReceivedBytesMetric bool              `yaml:"sendReceivedBytesMetric"`
 }
 
 func Load(configPath string) (Config, error) {
