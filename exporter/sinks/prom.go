@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"inet.af/netaddr"
 
 	"github.com/castai/egressd/exporter/config"
@@ -46,8 +47,26 @@ type PromRemoteWriteSink struct {
 func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) error {
 	now := s.timeGetter()
 
-	ts := make([]promwrite.TimeSeries, 0, len(batch.Items))
+	var errg errgroup.Group
+	errg.Go(func() error {
+		return s.pushMetric(ctx, batch, now, "egressd_transmit_bytes_total", func(v *pb.PodNetworkMetric) float64 {
+			return float64(v.TxBytes)
+		})
+	})
 
+	if s.cfg.SendReceivedBytesMetric {
+		errg.Go(func() error {
+			return s.pushMetric(ctx, batch, now, "egressd_received_bytes_total", func(v *pb.PodNetworkMetric) float64 {
+				return float64(v.RxBytes)
+			})
+		})
+	}
+
+	return errg.Wait()
+}
+
+func (s *PromRemoteWriteSink) pushMetric(ctx context.Context, batch *pb.PodNetworkMetricBatch, now time.Time, name string, valueFunc func(v *pb.PodNetworkMetric) float64) error {
+	ts := make([]promwrite.TimeSeries, 0, len(batch.Items))
 	for _, m := range batch.Items {
 		dstIP, _ := netaddr.ParseIP(m.DstIp)
 		dstIPType := "public"
@@ -56,7 +75,7 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 		}
 		// Initial labels, sorted by label name asc.
 		labels := []promwrite.Label{
-			{Name: "__name__", Value: "egressd_transmit_bytes_total"},
+			{Name: "__name__", Value: name},
 			{Name: "cross_zone", Value: isCrossZoneValue(m)},
 			{Name: "dst_ip", Value: dstIP.String()},
 			{Name: "dst_ip_type", Value: dstIPType},
@@ -87,12 +106,12 @@ func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetr
 			Labels: labels,
 			Sample: promwrite.Sample{
 				Time:  now,
-				Value: float64(m.TxBytes),
+				Value: valueFunc(m),
 			},
 		})
 	}
 
-	s.log.Infof("pushing metrics, timeseries=%d", len(ts))
+	s.log.Infof("pushing metrics %q, timeseries=%d", name, len(ts))
 
 	_, err := s.client.Write(ctx, &promwrite.WriteRequest{
 		TimeSeries: ts,

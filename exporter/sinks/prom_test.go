@@ -2,6 +2,8 @@ package sinks
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -80,7 +82,7 @@ func TestPromSink(t *testing.T) {
 				Sample: promwrite.Sample{Time: ts, Value: 35},
 			},
 		},
-			client.req.TimeSeries)
+			client.reqs[0].TimeSeries)
 	})
 
 	t.Run("push with custom labels", func(t *testing.T) {
@@ -92,6 +94,7 @@ func TestPromSink(t *testing.T) {
 			Labels: map[string]string{
 				"xz_label_key": "xz_label_value",
 			},
+			SendReceivedBytesMetric: true,
 		}
 		client := &mockPromWriteClient{}
 		ts := time.Date(2023, time.April, 13, 13, 41, 48, 926278000, time.UTC)
@@ -125,6 +128,34 @@ func TestPromSink(t *testing.T) {
 			},
 		}
 		r.NoError(sink.Push(ctx, batch))
+		r.Len(client.reqs, 2)
+
+		slices.SortFunc(client.reqs, func(a, b *promwrite.WriteRequest) int {
+			return strings.Compare(a.TimeSeries[0].Labels[0].Name, b.TimeSeries[0].Labels[0].Name)
+		})
+
+		r.Equal([]promwrite.TimeSeries{
+			{
+				Labels: []promwrite.Label{
+					{Name: "__name__", Value: "egressd_received_bytes_total"},
+					{Name: "cross_zone", Value: "false"},
+					{Name: "dst_ip", Value: "10.14.7.5"},
+					{Name: "dst_ip_type", Value: "private"},
+					{Name: "dst_namespace", Value: "team2"},
+					{Name: "dst_node", Value: "n1"},
+					{Name: "dst_pod", Value: "p2"},
+					{Name: "dst_zone", Value: "us-east-1a"},
+					{Name: "proto", Value: "TCP"},
+					{Name: "src_ip", Value: "10.14.7.12"},
+					{Name: "src_namespace", Value: "team1"},
+					{Name: "src_node", Value: "n1"},
+					{Name: "src_pod", Value: "p1"},
+					{Name: "src_zone", Value: "us-east-1a"},
+					{Name: "xz_label_key", Value: "xz_label_value"},
+				},
+				Sample: promwrite.Sample{Time: ts, Value: 30},
+			},
+		}, client.reqs[0].TimeSeries)
 
 		r.Equal([]promwrite.TimeSeries{
 			{
@@ -147,17 +178,16 @@ func TestPromSink(t *testing.T) {
 				},
 				Sample: promwrite.Sample{Time: ts, Value: 35},
 			},
-		},
-			client.req.TimeSeries)
+		}, client.reqs[1].TimeSeries)
 	})
 
 }
 
 type mockPromWriteClient struct {
-	req *promwrite.WriteRequest
+	reqs []*promwrite.WriteRequest
 }
 
 func (m *mockPromWriteClient) Write(ctx context.Context, req *promwrite.WriteRequest, options ...promwrite.WriteOption) (*promwrite.WriteResponse, error) {
-	m.req = req
+	m.reqs = append(m.reqs, req)
 	return nil, nil
 }
