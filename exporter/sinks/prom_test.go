@@ -4,12 +4,14 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/castai/promwrite"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+
+	"github.com/castai/promwrite"
 
 	"github.com/castai/egressd/exporter/config"
 	"github.com/castai/egressd/pb"
@@ -185,9 +187,12 @@ func TestPromSink(t *testing.T) {
 
 type mockPromWriteClient struct {
 	reqs []*promwrite.WriteRequest
+	m    sync.Mutex
 }
 
 func (m *mockPromWriteClient) Write(ctx context.Context, req *promwrite.WriteRequest, options ...promwrite.WriteOption) (*promwrite.WriteResponse, error) {
+	m.m.Lock()
 	m.reqs = append(m.reqs, req)
+	m.m.Unlock()
 	return nil, nil
 }

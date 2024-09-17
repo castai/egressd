@@ -62,6 +62,8 @@ github.com/cilium/checkmate v1.0.3 h1:CQC5eOmlAZeEjPrVZY3ZwEBH64lHlx9mXYdUehEwI5
 github.com/cilium/checkmate v1.0.3/go.mod h1:KiBTasf39/F2hf2yAmHw21YFl3hcEyP4Yk6filxc12A=
 github.com/cilium/cilium v1.14.9 h1:zpdSxRTsS1zTmKiQOcjQcufdbLhWd6xB2P5MUHkPvPs=
 github.com/cilium/cilium v1.14.9/go.mod h1:C7oSDsowsW95diUPa4C29qEPKpMK2ZcdmmLMIRgyPno=
+github.com/cilium/cilium v1.14.12 h1:lQ4XilTUJK5R6BrZnSm4pYxj6jsBQFWlBuRHA5FHJ1I=
+github.com/cilium/cilium v1.14.12/go.mod h1:Pjy+qd1hrrXulp78Hs76ahKCttij64LvjxFui9XquVA=
 github.com/cilium/ebpf v0.5.0/go.mod h1:4tRaxcgiL706VnOzHOdBlY8IEAIdxINsQBcU4xJJXRs=
 github.com/cilium/ebpf v0.7.0/go.mod h1:/oI2+1shJiTGAMgl6/RgJr36Eo1jzrRcAWbcXO2usCA=
 github.com/cilium/ebpf v0.10.1-0.20230626090016-654491c8a500 h1:eAn1/gEVvcamZLoF4JKznmG2zKABsF7mRisyfQtwa3Q=
