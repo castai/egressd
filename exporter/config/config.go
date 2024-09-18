@@ -10,10 +10,12 @@ import (
 )
 
 type Config struct {
-	PodIP          string          `envconfig:"POD_IP" yaml:"podIP"`
-	PodNamespace   string          `envconfig:"POD_NAMESPACE" yaml:"podNamespace"`
-	ExportInterval time.Duration   `envconfig:"EXPORT_INTERVAL" yaml:"exportInterval"`
-	Sinks          map[string]Sink `yaml:"sinks"`
+	PodIP                          string          `envconfig:"POD_IP" yaml:"podIP"`
+	PodNamespace                   string          `envconfig:"POD_NAMESPACE" yaml:"podNamespace"`
+	ExportInterval                 time.Duration   `envconfig:"EXPORT_INTERVAL" yaml:"exportInterval"`
+	CollectorsConcurrentFetchCount int             `envconfig:"COLLECTORS_CONCURRENT_FETCH_COUNT" yaml:"collectorsConcurrentFetchCount"`
+	CollectorFetchTimeout          time.Duration   `envconfig:"COLLECTOR_FETCH_TIMEOUT" yaml:"collectorFetchTimeout"`
+	Sinks                          map[string]Sink `yaml:"sinks"`
 }
 
 type SinkType string
@@ -75,6 +77,12 @@ func Load(configPath string) (Config, error) {
 
 	if cfg.ExportInterval == 0 {
 		cfg.ExportInterval = 60 * time.Second
+	}
+	if cfg.CollectorsConcurrentFetchCount == 0 {
+		cfg.CollectorsConcurrentFetchCount = 20
+	}
+	if cfg.CollectorFetchTimeout == 0 {
+		cfg.CollectorFetchTimeout = 3 * time.Second
 	}
 
 	if len(cfg.Sinks) == 0 {

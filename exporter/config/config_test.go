@@ -66,9 +66,11 @@ sinks:
 
 func newTestConfig() Config {
 	return Config{
-		PodIP:          "10.10.1.15",
-		PodNamespace:   "egressd",
-		ExportInterval: 60 * time.Second,
+		PodIP:                          "10.10.1.15",
+		PodNamespace:                   "egressd",
+		ExportInterval:                 60 * time.Second,
+		CollectorsConcurrentFetchCount: 20,
+		CollectorFetchTimeout:          3 * time.Second,
 		Sinks: map[string]Sink{
 			"castai": {
 				HTTPConfig: &SinkHTTPConfig{
