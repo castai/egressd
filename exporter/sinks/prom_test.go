@@ -133,7 +133,7 @@ func TestPromSink(t *testing.T) {
 		r.Len(client.reqs, 2)
 
 		slices.SortFunc(client.reqs, func(a, b *promwrite.WriteRequest) int {
-			return strings.Compare(a.TimeSeries[0].Labels[0].Name, b.TimeSeries[0].Labels[0].Name)
+			return strings.Compare(a.TimeSeries[0].Labels[0].Value, b.TimeSeries[0].Labels[0].Value)
 		})
 
 		r.Equal([]promwrite.TimeSeries{

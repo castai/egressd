@@ -27,8 +27,7 @@ import (
 )
 
 const (
-	collectorsConcurrentFetch = 20
-	sinkConcurrentPush        = 5
+	sinkConcurrentPush = 5
 )
 
 func New(
@@ -104,11 +103,11 @@ func (e *Exporter) export(ctx context.Context) error {
 	// Fetch network metrics from all collectors.
 	e.log.Debugf("fetching network metrics from %d collector(s)", collectorsCount)
 
-	pulledBatch := make(chan *pb.RawNetworkMetricBatch, collectorsConcurrentFetch)
+	pulledBatch := make(chan *pb.RawNetworkMetricBatch, e.cfg.CollectorsConcurrentFetchCount)
 
 	go func() {
 		var fetchGroup errgroup.Group
-		fetchGroup.SetLimit(collectorsConcurrentFetch)
+		fetchGroup.SetLimit(e.cfg.CollectorsConcurrentFetchCount)
 
 		for _, pod := range collectorPodsList.Items {
 			pod := pod
@@ -127,6 +126,9 @@ func (e *Exporter) export(ctx context.Context) error {
 
 			fetchGroup.Go(func() error {
 				if err := func() error {
+					ctx, cancel := context.WithTimeout(ctx, e.cfg.CollectorFetchTimeout)
+					defer cancel()
+
 					batch, err := e.fetchRawNetworkMetricsBatch(ctx, url)
 					if err != nil {
 						return fmt.Errorf("fetching metrics from collector, url=%s: %w", url, err)
@@ -138,7 +140,7 @@ func (e *Exporter) export(ctx context.Context) error {
 					pulledBatch <- batch
 					return nil
 				}(); err != nil {
-					e.log.Error(err)
+					e.log.Warn(err)
 				}
 				return nil
 			})

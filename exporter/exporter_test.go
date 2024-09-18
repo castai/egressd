@@ -145,7 +145,9 @@ func TestExporter(t *testing.T) {
 	sink := &mockSink{batch: make(chan *pb.PodNetworkMetricBatch)}
 
 	cfg := config.Config{
-		ExportInterval: 100 * time.Millisecond,
+		ExportInterval:                 100 * time.Millisecond,
+		CollectorFetchTimeout:          3 * time.Second,
+		CollectorsConcurrentFetchCount: 20,
 		Sinks: map[string]config.Sink{
 			"castai": {
 				HTTPConfig: &config.SinkHTTPConfig{},
