@@ -2,10 +2,6 @@
 
 Kubernetes aware network traffic monitoring.
 
-## NOTE
-
-Deprecated. Please see https://github.com/castai/kvisor netflow collection.
-
 ### How it works
 
 * DaemonSet pod starts on each node.
