@@ -42,6 +42,20 @@ uninstall_components() {
   echo "Uninstallation completed."
 }
 
+usage() {
+  echo "Usage: $0 [--uninstall] [--namespace <namespace>]"
+  echo ""
+  echo "Options:"
+  echo "  --uninstall          Uninstall all components and delete the namespace."
+  echo "  --namespace <name>   Specify a custom namespace for installation. Default is 'egressd'."
+  echo ""
+  echo "Examples:"
+  echo "  $0                    Install components in the default namespace 'egressd'."
+  echo "  $0 --namespace test   Install components in the 'test' namespace."
+  echo "  $0 --uninstall        Uninstall all components from the default namespace 'egressd'."
+  exit 1
+}
+
 # Default namespace
 NAMESPACE=$DEFAULT_NAMESPACE
 
@@ -58,7 +72,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown parameter $1"
-      exit 1
+      usage
       ;;
   esac
 done
