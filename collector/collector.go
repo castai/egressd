@@ -49,6 +49,9 @@ type Config struct {
 	// or as the constantly growing counter value
 	SendTrafficDelta bool
 	LogEntries       bool
+
+	    // New field to accept custom CIDR ranges as strings
+    CustomPrivateCIDRs  []string
 }
 
 type podsWatcher interface {
@@ -84,6 +87,16 @@ func New(
 		panic("cleanup interval not set")
 	}
 
+	customPrivateCIDRs := make([]netaddr.IPPrefix, 0, len(cfg.CustomPrivateCIDRs))
+    for _, cidr := range cfg.CustomPrivateCIDRs {
+        prefix, err := netaddr.ParseIPPrefix(cidr)
+        if err != nil {
+            log.Errorf("invalid CIDR: %s, error: %v", cidr, err)
+            continue
+        }
+        customPrivateCIDRs = append(customPrivateCIDRs, prefix)
+    }
+
 	return &Collector{
 		cfg:               cfg,
 		log:               log,
@@ -94,6 +107,7 @@ func New(
 		podMetrics:        map[uint64]*rawNetworkMetric{},
 		excludeNsMap:      excludeNsMap,
 		currentTimeGetter: currentTimeGetter,
+		customPrivateCIDRs: customPrivateCIDRs,
 		exporterClient:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -109,6 +123,7 @@ type Collector struct {
 	excludeNsMap      map[string]struct{}
 	currentTimeGetter func() time.Time
 	exporterClient    *http.Client
+	customPrivateCIDRs []netaddr.IPPrefix
 	mu                sync.Mutex
 
 	firstCollectDone bool
@@ -385,11 +400,22 @@ func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 	return res
 }
 
-func isPrivateNetwork(ip netaddr.IP) bool {
-	return ip.IsPrivate() ||
-		ip.IsLoopback() ||
-		ip.IsMulticast() ||
-		ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() ||
-		ip.IsInterfaceLocalMulticast()
+func (c *Collector) isPrivateNetwork(ip netaddr.IP) bool {
+    if ip.IsPrivate() ||
+        ip.IsLoopback() ||
+        ip.IsMulticast() ||
+        ip.IsLinkLocalUnicast() ||
+        ip.IsLinkLocalMulticast() ||
+        ip.IsInterfaceLocalMulticast() {
+        return true
+    }
+
+    // Check custom CIDR ranges
+    for _, cidr := range c.customPrivateCIDRs {
+        if cidr.Contains(ip) {
+            return true
+        }
+    }
+
+    return false
 }
