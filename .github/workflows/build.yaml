@@ -97,7 +97,7 @@ jobs:
           platforms: linux/arm64,linux/amd64
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/castai/egressd/egressd:${{ github.sha }}
+          tags: ghcr.io/hany-mhajna-payu-gpo/egressd/egressd:${{ github.sha }}
 
       - name: Build and push (egressd exporter)
         if: ${{ github.event_name != 'release' }}
@@ -107,7 +107,7 @@ jobs:
           platforms: linux/arm64,linux/amd64
           file: ./Dockerfile.exporter
           push: true
-          tags: ghcr.io/castai/egressd/egressd-exporter:${{ github.sha }}
+          tags: ghcr.io/hany-mhajna-payu-gpo/egressd/egressd-exporter:${{ github.sha }}
 
   e2e:
     name: E2E
