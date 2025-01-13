@@ -45,7 +45,7 @@ type HTTPSink struct {
 }
 
 func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) error {
-	uri, err := url.Parse(s.cfg.URL)
+	uri, err := url.Parse(os.ExpandEnv(s.cfg.URL))
 	if err != nil {
 		return fmt.Errorf("invalid url: %w", err)
 	}
