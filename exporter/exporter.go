@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/castai/egressd/collector"
 	"github.com/castai/egressd/dns"
 	"github.com/castai/egressd/exporter/config"
 	"github.com/castai/egressd/exporter/sinks"
@@ -225,7 +226,7 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 	}
 
 	// Try to find destination pod and node info.
-	if dstIP.IsPrivate() {
+	if collector.IsPrivateNetwork(dstIP, e.cfg.CustomPrivateCIDRs...) {
 		dstIPStr := dstIP.String()
 		// First try finding destination pod by ip.
 		dstPod, err := e.kubeWatcher.GetPodByIP(dstIPStr)
@@ -254,6 +255,18 @@ func (e *Exporter) buildPodNetworkMetric(conn *pb.RawNetworkMetric) (*pb.PodNetw
 			if dstNode != nil {
 				metric.DstNode = dstNode.Name
 				metric.DstZone = getNodeZone(dstNode)
+			} else {
+				// No destination node was found.
+				// This might indicate that the destination is not a pod or node within the cluster but an external (private) service outside the cluster and, as such, not recognized by the Kubernetes API.
+				// In this scenario, we can attempt to resolve the DNS name corresponding to the destination IP.
+				e.log.Debugf("no destination pod or node found for ip %q, trying to resolve DNS name", dstIPStr)
+				dstDnsName := e.dnsStorage.Lookup(dns.ToIPint32(dstIP))
+				if dstDnsName != "" {
+					e.log.Debugf("Setting DNS name for ip %q: %q", dstIPStr, dstDnsName)
+					metric.DstDnsName = dstDnsName
+				} else {
+					e.log.Warnf("no destination pod, node or DNS name found for ip %q", dstIPStr)
+				}
 			}
 		}
 	} else {

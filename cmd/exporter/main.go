@@ -5,10 +5,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -34,6 +36,11 @@ var (
 	logLevel       = flag.String("log-level", logrus.InfoLevel.String(), "Log level")
 	httpListenPort = flag.Int("http-listen-port", 6060, "HTTP server listen port")
 	configPath     = flag.String("config-path", "/etc/egressd/config/config.yaml", "Path to exporter config path")
+
+	// Flag that specifies a set of custom private cidr ranges
+	// It could be the case that you use a public cidr in your private network
+	// and you want to exclude it to be marked as public
+	privateCIDRs = flag.String("private-cidrs", "", "Comma-separated list of private CIDRs")
 )
 
 // These should be set via `go build` during a release.
@@ -113,10 +120,25 @@ func run(log logrus.FieldLogger) error {
 		nodeByIP:   nodeByIPCache,
 	}
 
+	var customPrivateCIDRs []*net.IPNet
+	// privateCIDRs is a comma separated list of private CIDRs
+	if *privateCIDRs != "" {
+		customPrivateCIDRs = make([]*net.IPNet, 0)
+		for _, cidr := range strings.Split(*privateCIDRs, ",") {
+			_, ipnet, err := net.ParseCIDR(cidr)
+			if err != nil {
+				return fmt.Errorf("parsing custom private CIDRs: %w", err)
+			}
+			customPrivateCIDRs = append(customPrivateCIDRs, ipnet)
+		}
+	}
+
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		return err
 	}
+
+	cfg.CustomPrivateCIDRs = customPrivateCIDRs
 
 	var sinksList []sinks.Sink
 	for name, s := range cfg.Sinks {
@@ -129,7 +151,7 @@ func run(log logrus.FieldLogger) error {
 			))
 		} else if s.PromRemoteWriteConfig != nil {
 			sinksList = append(sinksList, sinks.NewPromRemoteWriteSink(
-				log, name, *s.PromRemoteWriteConfig,
+				log, name, *s.PromRemoteWriteConfig, cfg,
 			))
 		}
 	}
