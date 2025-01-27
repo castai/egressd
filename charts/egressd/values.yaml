@@ -118,7 +118,9 @@ collector:
 
   # Explicitly set conntrack mode (netfilter,cilium)
   ctMode: ""
-
+  updateStrategy: RollingUpdate
+  maxUnavailable: 1
+  
 exporter:
   image:
     repository: ghcr.io/castai/egressd/egressd-exporter
