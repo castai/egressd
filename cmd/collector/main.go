@@ -5,10 +5,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -52,6 +54,11 @@ var (
 
 	// Explicitly allow to set conntrack client mode.
 	ctMode = flag.String("ct-mode", "", "Explicitly set conntract mode (netfilter,cilium)")
+
+	// Flag that specifies a set of custom private cidr ranges
+	// It could be the case that you use a public cidr in your private network
+	// and you want to exclude it to be marked as public
+	privateCIDRs = flag.String("private-cidrs", "", "Comma-separated list of private CIDRs")
 )
 
 // These should be set via `go build` during a release.
@@ -133,14 +140,28 @@ func run(log logrus.FieldLogger) error {
 		ip2dns = dns.NewIP2DNS(tracer, log)
 	}
 
+	var customPrivateCIDRs []*net.IPNet
+	// privateCIDRs is a comma separated list of private CIDRs
+	if *privateCIDRs != "" {
+		customPrivateCIDRs = make([]*net.IPNet, 0)
+		for _, cidr := range strings.Split(*privateCIDRs, ",") {
+			_, ipnet, err := net.ParseCIDR(cidr)
+			if err != nil {
+				return fmt.Errorf("parsing custom private CIDRs: %w", err)
+			}
+			customPrivateCIDRs = append(customPrivateCIDRs, ipnet)
+		}
+	}
+
 	cfg := collector.Config{
-		ReadInterval:      *readInterval,
-		CleanupInterval:   *cleanupInterval,
-		NodeName:          os.Getenv("NODE_NAME"),
-		ExcludeNamespaces: *excludeNamespaces,
-		GroupPublicIPs:    *groupPublicIPs,
-		SendTrafficDelta:  *sendTrafficDelta,
-		LogEntries:        *logEntries,
+		ReadInterval:       *readInterval,
+		CleanupInterval:    *cleanupInterval,
+		NodeName:           os.Getenv("NODE_NAME"),
+		ExcludeNamespaces:  *excludeNamespaces,
+		GroupPublicIPs:     *groupPublicIPs,
+		SendTrafficDelta:   *sendTrafficDelta,
+		LogEntries:         *logEntries,
+		CustomPrivateCIDRs: customPrivateCIDRs,
 	}
 	coll := collector.New(
 		cfg,

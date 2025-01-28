@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -51,6 +52,7 @@ sinks:
 		r := require.New(t)
 		expectedCfg := newTestConfig()
 		expectedCfg.PodNamespace = "from-env"
+		expectedCfg.CustomPrivateCIDRs = []*net.IPNet{}
 		r.NoError(os.Setenv("POD_NAMESPACE", expectedCfg.PodNamespace))
 
 		cfgBytes, err := yaml.Marshal(expectedCfg)
@@ -71,6 +73,7 @@ func newTestConfig() Config {
 		ExportInterval:                 60 * time.Second,
 		CollectorsConcurrentFetchCount: 20,
 		CollectorFetchTimeout:          3 * time.Second,
+		CustomPrivateCIDRs:             nil,
 		Sinks: map[string]Sink{
 			"castai": {
 				HTTPConfig: &SinkHTTPConfig{

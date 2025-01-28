@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/maphash"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -49,6 +50,9 @@ type Config struct {
 	// or as the constantly growing counter value
 	SendTrafficDelta bool
 	LogEntries       bool
+
+	// CustomPrivateCIDRs is a list of custom private CIDRs that should be considered as private networks.
+	CustomPrivateCIDRs []*net.IPNet
 }
 
 type podsWatcher interface {
@@ -255,7 +259,7 @@ func (c *Collector) collect() error {
 			continue
 		}
 
-		if c.cfg.GroupPublicIPs && !isPrivateNetwork(conn.Dst.IP()) {
+		if c.cfg.GroupPublicIPs && !IsPrivateNetwork(conn.Dst.IP(), c.cfg.CustomPrivateCIDRs...) {
 			conn.Dst = netaddr.IPPortFrom(netaddr.IPv4(0, 0, 0, 0), 0)
 		}
 
@@ -385,7 +389,14 @@ func conntrackEntryKey(conn *conntrack.Entry) uint64 {
 	return res
 }
 
-func isPrivateNetwork(ip netaddr.IP) bool {
+func IsPrivateNetwork(ip netaddr.IP, customCIDRs ...*net.IPNet) bool {
+	// Check if the IP is in the custom CIDRs
+	for _, cidr := range customCIDRs {
+		if cidr.Contains(ip.IPAddr().IP) {
+			return true
+		}
+	}
+
 	return ip.IsPrivate() ||
 		ip.IsLoopback() ||
 		ip.IsMulticast() ||

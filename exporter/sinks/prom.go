@@ -7,22 +7,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
-	"inet.af/netaddr"
-
+	"github.com/castai/egressd/collector"
 	"github.com/castai/egressd/exporter/config"
 	"github.com/castai/egressd/pb"
 	"github.com/castai/promwrite"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+	"inet.af/netaddr"
 )
 
 type promWriter interface {
 	Write(ctx context.Context, req *promwrite.WriteRequest, options ...promwrite.WriteOption) (*promwrite.WriteResponse, error)
 }
 
-func NewPromRemoteWriteSink(log logrus.FieldLogger, sinkName string, cfg config.SinkPromRemoteWriteConfig) Sink {
+func NewPromRemoteWriteSink(log logrus.FieldLogger, sinkName string, cfg config.SinkPromRemoteWriteConfig, exporterConfig config.Config) Sink {
 
 	return &PromRemoteWriteSink{
+		exporterConfig: exporterConfig,
 		log: log.WithFields(map[string]interface{}{
 			"sink_type": "prom_remote_write",
 			"sink_name": sinkName,
@@ -38,10 +39,11 @@ func timeGetter() time.Time {
 }
 
 type PromRemoteWriteSink struct {
-	cfg        config.SinkPromRemoteWriteConfig
-	log        logrus.FieldLogger
-	client     promWriter
-	timeGetter func() time.Time
+	exporterConfig config.Config
+	cfg            config.SinkPromRemoteWriteConfig
+	log            logrus.FieldLogger
+	client         promWriter
+	timeGetter     func() time.Time
 }
 
 func (s *PromRemoteWriteSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) error {
@@ -70,7 +72,7 @@ func (s *PromRemoteWriteSink) pushMetric(ctx context.Context, batch *pb.PodNetwo
 	for _, m := range batch.Items {
 		dstIP, _ := netaddr.ParseIP(m.DstIp)
 		dstIPType := "public"
-		if dstIP.IsPrivate() {
+		if collector.IsPrivateNetwork(dstIP, s.exporterConfig.CustomPrivateCIDRs...) {
 			dstIPType = "private"
 		}
 		// Initial labels, sorted by label name asc.
