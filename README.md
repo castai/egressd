@@ -12,9 +12,9 @@ Kubernetes aware network traffic monitoring.
 * Kubernetes context is added including source and destination pods, nodes, node zones, ips.
 * Exporter can export logs to http or prometheus.
 
-#### Priviledges
+#### Privileges
 
-Egressd runs as priviledged container for a few reasons:
+Egressd runs as privileged container for a few reasons:
 1. DNS tracer uses eBPF.
 2. Fetch conntrack entries:
     * Bidirectional mount propogation is used to enable netfilter conntrack accounting and mount cgroupv2.
@@ -46,7 +46,7 @@ helm upgrade --install onlineboutique oci://us-docker.pkg.dev/online-boutique-ci
 
 ### Development
 
-Start all components + test grafana,promtheus in tilt local k8s cluster.
+Start all components + test grafana,prometheus in tilt local k8s cluster.
 ```
 tilt up
 ```
