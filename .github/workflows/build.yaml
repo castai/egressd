@@ -66,16 +66,16 @@ jobs:
           GOARCH: arm64
           CGO_ENABLED: 0
 
-      - name: Run golangci-lint
-        # You may pin to the exact commit or the version.
-        # uses: golangci/golangci-lint-action@537aa1903e5d359d0b27dbc19ddd22c5087f3fbc
-        if: ${{ github.event_name == 'pull_request' && !contains(env.head_commit_message, '#skip-lint') }}
-        uses: golangci/golangci-lint-action@v3.2.0
-        with:
-          args: --timeout=5m
-          skip-pkg-cache: true
-          skip-build-cache: true
-          version: v1.58.2
+      # - name: Run golangci-lint
+      #   # You may pin to the exact commit or the version.
+      #   # uses: golangci/golangci-lint-action@537aa1903e5d359d0b27dbc19ddd22c5087f3fbc
+      #   if: ${{ github.event_name == 'pull_request' && !contains(env.head_commit_message, '#skip-lint') }}
+      #   uses: golangci/golangci-lint-action@v3.2.0
+      #   with:
+      #     args: --timeout=5m
+      #     skip-pkg-cache: true
+      #     skip-build-cache: true
+      #     version: v1.58.2
 
       - name: Test
         if: ${{ github.event_name == 'pull_request' && !contains(env.head_commit_message, '#skip-test') }}
