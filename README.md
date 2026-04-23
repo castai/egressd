@@ -1,5 +1,9 @@
 # egressd
 
+> [!WARNING]  
+> **egressd** is deprecated and will no longer receive new features or active maintenance. For CAST.AI customers, we recommend migrating to [Kvisor Netflow](https://docs.cast.ai/docs/network-observability).
+
+
 Kubernetes aware network traffic monitoring.
 
 ### How it works
