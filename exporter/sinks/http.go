@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -90,17 +93,40 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	reqID := uuid.NewString()
+
+	trace := &httptrace.ClientTrace{
+		GotConn: func(connInfo httptrace.GotConnInfo) {
+			fmt.Printf("http_sink_trace ts=%s req_id=%s method=GotConn: %+v remote=%s\n", time.Now().UTC().Format(time.RFC3339Nano), reqID, connInfo, connInfo.Conn.RemoteAddr().String())
+		},
+		DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
+			fmt.Printf("http_sink_trace ts=%s req_id=%s method=DNSDone: %+v\n", time.Now().UTC().Format(time.RFC3339Nano), reqID, dnsInfo)
+		},
+		DNSStart: func(dnsInfo httptrace.DNSStartInfo) {
+			fmt.Printf("http_sink_trace ts=%s req_id=%s method=DNSStart: %+v\n", time.Now().UTC().Format(time.RFC3339Nano), reqID, dnsInfo)
+		},
+		TLSHandshakeStart: func() {
+			fmt.Printf("http_sink_trace ts=%s req_id=%s method=TLSHandshakeStart\n", time.Now().UTC().Format(time.RFC3339Nano), reqID)
+		},
+		TLSHandshakeDone: func(state tls.ConnectionState, err error) {
+			fmt.Printf("http_sink_trace ts=%s req_id=%s method=TLSHandshakeDone err=%v\n", time.Now().UTC().Format(time.RFC3339Nano), reqID, err)
+		},
+	}
+	ctx = httptrace.WithClientTrace(ctx, trace)
+
 	req, err := http.NewRequestWithContext(ctx, s.cfg.Method, uri.String(), payloadBuf)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header = header
+	req.Header.Add("X-Request-ID", reqID)
 
-	s.log.Infof("pushing metrics, items=%d, size_bytes=%d", len(batch.Items), payloadBuf.Len())
+	s.log.Infof("pushing metrics, req_id=%s, items=%d, size_bytes=%d", reqID, len(batch.Items), payloadBuf.Len())
 
 	var resp *http.Response
 	backoff := wait.Backoff{
-		Duration: 10 * time.Millisecond,
+		Duration: 100 * time.Millisecond,
 		Factor:   1.5,
 		Jitter:   0.2,
 		Steps:    3,
@@ -108,8 +134,8 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 	err = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (done bool, err error) {
 		resp, err = s.httpClient.Do(req) //nolint:bodyclose
 		if err != nil {
-			s.log.Warnf("failed sending request: %v", err)
-			return false, fmt.Errorf("sending request %w", err)
+			s.log.Warnf("failed sending request, req_id=%s, %v", reqID, err)
+			return false, fmt.Errorf("sending request, req_id=%s:%w", reqID, err)
 		}
 		return true, nil
 	})
@@ -127,7 +153,7 @@ func (s *HTTPSink) Push(ctx context.Context, batch *pb.PodNetworkMetricBatch) er
 		if _, err := buf.ReadFrom(resp.Body); err != nil {
 			s.log.Errorf("failed reading error response body: %v", err)
 		}
-		return fmt.Errorf("request error status_code=%d body=%s url=%s", resp.StatusCode, buf.String(), uri.String())
+		return fmt.Errorf("request error req_id=%s status_code=%d body=%s url=%s", reqID, resp.StatusCode, buf.String(), uri.String())
 	}
 
 	return nil

@@ -43,6 +43,7 @@ func TestHTTPSink(t *testing.T) {
 			"Custom-Header": "1",
 		},
 		Timeout: 10 * time.Second,
+		Trace:   true,
 	}
 	sink := NewHTTPSink(log, "http-test", cfg, "0.0.0")
 	expectedBatch := &pb.PodNetworkMetricBatch{
