@@ -77,6 +77,7 @@ func (s *PromRemoteWriteSink) pushMetric(ctx context.Context, batch *pb.PodNetwo
 		labels := []promwrite.Label{
 			{Name: "__name__", Value: name},
 			{Name: "cross_zone", Value: isCrossZoneValue(m)},
+			{Name: "dst_dns_name", Value: m.DstDnsName},
 			{Name: "dst_ip", Value: dstIP.String()},
 			{Name: "dst_ip_type", Value: dstIPType},
 			{Name: "dst_namespace", Value: m.DstNamespace},
