@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"net"
 	"os"
 	"time"
 
@@ -16,6 +17,9 @@ type Config struct {
 	CollectorsConcurrentFetchCount int             `envconfig:"COLLECTORS_CONCURRENT_FETCH_COUNT" yaml:"collectorsConcurrentFetchCount"`
 	CollectorFetchTimeout          time.Duration   `envconfig:"COLLECTOR_FETCH_TIMEOUT" yaml:"collectorFetchTimeout"`
 	Sinks                          map[string]Sink `yaml:"sinks"`
+
+	// CustomPrivateCIDRs is a list of custom private CIDRs that should be considered as private networks.
+	CustomPrivateCIDRs []*net.IPNet
 }
 
 type SinkType string
